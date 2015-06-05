@@ -212,3 +212,121 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
 
 
 let _ = wf_btree empty_store0 (root0,Entry_set.empty,0) 1
+
+
+(* section 3: insertion as abstract machine rules *)
+
+type ins_comm = Insert of entry | S | D of (key * page_id) | Ret
+
+type config = ins_comm * page_id * ((page_id * int)list) * store
+
+let initial_config a (r,s) = (Insert(a),r,[],s)
+
+let first xs p = (
+  let rec f1 i = 
+    if i <= List.length xs then 
+      if p (nth_from_1 xs i) then i else f1 (i+1)
+    else
+      List.length xs + 1
+  in
+  f1 1)
+
+let _ = first [1;2;3] (fun x -> x=5)
+  
+let test k xs p = (
+  if (1 <= k && k <= List.length xs) then
+    p (nth_from_1 xs k)
+  else
+    false)
+
+let rec replace(a,i,es) = (
+  match i with 
+  | 0 -> failwith "replace: 0"
+  | 1 -> (
+      match es with
+      | [] -> failwith "replace: es=[]"
+      | x::xs -> a::xs)
+  | _ -> (
+      match es with
+      | [] -> failwith "replace: es=[] 2"
+      | e::es -> e::replace(a,i-1,es)))
+
+let rec ins (a,i,xs) = (
+  match i with 
+  | 0 -> failwith "ins: 0"
+  | 1 -> a::xs
+  | _ -> (
+      match xs with
+      | [] -> failwith "ins: []"
+      | x::xs -> x::(ins (a,i-1,xs))))
+
+let rec take2 xs n = (
+  match n with
+  | 0 -> ([],xs)
+  | _ -> (
+      match xs with
+      | [] -> ([],[])
+      | x::xs -> (
+          let (b,c) = (take2 xs (n-1)) in
+          ((x::b),c))))
+
+
+let split_l (i,a,es0) = (
+  let es = ins(a,i,es0) in
+  let (es',es'') = take2 es (List.length es / 2) in
+  let k = (
+    match es'' with
+    | [] -> failwith "impossible split_l"
+    | e::_ -> entry_to_key e)
+  in
+  (es',k,es''))
+
+let free_page_id s0 = (
+  let rec f1 x = (
+    if Store_map.mem (Page_id x) s0 then f1 (x+1) else Page_id(x)
+  )
+  in
+  f1 0)
+
+
+let trans c0 = (
+  match c0 with
+  | (c,r,pi,sg) -> (
+      match c with
+      | Insert(a) -> (
+          match (store_map_find sg r) with
+          | Some(INode(I(ds,ps))) -> (
+              let i = first ds (fun x -> x > entry_to_key(a)) in
+              Some(Insert(a),nth_from_1 ps i,(r,i)::pi,sg)
+            )
+          | Some(LNode(L(es))) -> (
+              let i = first es (fun x -> entry_to_key x >= entry_to_key a) in
+              if test i es (fun x -> entry_to_key x = entry_to_key a) then
+                let l' = LNode(L(replace(a,i,es))) in
+                Some(S,r,pi,Store_map.add r l' sg)
+              else if List.length es < maxN then
+                let l' = LNode(L(ins(a,i,es))) in
+                Some(S,r,pi,Store_map.add r l' sg) 
+              else 
+                let (es',k,es'') = split_l(i,a,es) in
+                let l1 = LNode(L(es')) in
+                let l2 = LNode(L(es'')) in
+                let q = free_page_id sg in
+                let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
+                Some(D(k,q),r,pi,sg')
+            )
+        )
+      | x -> None
+    )
+)
+
+
+let rec loop c0 = (
+  match trans c0 with
+  | None -> c0
+  | Some c -> loop c)
+
+let config0 = (Insert(Entry(2)),root0,[],empty_store0)
+
+let (a,b,c,d) = loop config0
+let _ = Store_map.bindings d
