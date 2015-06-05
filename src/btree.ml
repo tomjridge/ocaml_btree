@@ -84,7 +84,7 @@ let tmp = empty_store0 |> Store_map.add root0 (LNode(L([Entry(1)])))
 let _ = (entry_set empty_store0 root0) |> Entry_set.elements
 let _ = (entry_set tmp root0) |> Entry_set.elements
 
-let get_m s0 r = (
+let get_m: node Store_map.t -> Store_map.key -> int option = (fun s0 r ->
   match store_map_find s0 r with
   | None -> None
   | Some(node) -> (
@@ -155,67 +155,57 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
                         let ss i = i |> qq |> (entry_set s0) in
                         let mm i = i |> qq |> (get_m s0) in
                         let dd i = nth_from_1 ds i in
-                        let pred i = 
-                          let (qi,si,mi) = (qq i, ss i, mm i) in
-                          wf_btree s0 (qi,si,mi) h
+                        let rec_clause = 
+                          let pred i = 
+                            let (qi,si,mi) = (qq i, ss i, mm i) in
+                            match mi with
+                            | None -> false
+                            | Some(mi) -> (wf_btree s0 (qi,si,mi) h)
+                          in
+                          List.for_all pred (from_to 1 n)
                         in
-                        match List.for_all pred (from_to 1 n) with
-                        | false -> false
-                        | true -> (
-                            (* check S = S_1 Un ... *)
-                            let union = (from_to 1 n) |> List.map ss |> union_list_of_entry_set in
-                            match Entry_set.equals ss0 union with
-                            | false -> false
-                            | true -> (
-                                let cond_sj = (
-                                  let js = from_to 1 (n-1) in
-                                  let f3 j = 
-                                    let sj = ss j in
-                                    let dj = dd j in
-                                    let dj' = dd (j+1) in
-                                    Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj  (* NB use of ocaml <= for type key *)
-                                    && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj
-                                  in
-                                  List.for_all f3 js
-                                )
-                                in
-                                match cond_sj with
-                                | false -> false
-                                | true -> (
-                                    let cond_mj = (
-                                      let js = from_to 1 n in
-                                      let max_2 = (maxN+1) / 2 in (* FIXME check *)
-                                      let pred j = 
-                                        max_2 <= mm j
-                                      in
-                                      List.for_all pred js
-                                    )
-                                    in
-                                    match cond_mj with
-                                    | false -> false
-                                    | true -> (
-                                        let d1 = dd 1 in
-                                        let s1 = ss 1 in
-                                        let cond_s1 = Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < d1)) s1 in
-                                        match cond_s1 with
-                                        | false -> false
-                                        | true -> (
-                                            let dn' = dd (n-1) in
-                                            let sn = ss n in
-                                            let cond_sn = Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dn' <= k)) sn in
-                                            cond_sn
-                                          )
-                                      )
-                                      
-                                  )
-                              )
-
-                          )                    
+                        let union_clause = 
+                          (* check S = S_1 Un ... *)
+                          let union = (from_to 1 n) |> List.map ss |> union_list_of_entry_set in
+                          Entry_set.equal ss0 union
+                        in
+                        let cond_sj = (
+                          let js = from_to 1 (n-1) in
+                          let f3 j = 
+                            let sj = ss j in
+                            let dj = dd j in
+                            let dj' = dd (j+1) in
+                            Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj  (* NB use of ocaml <= for type key *)
+                            && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj
+                          in
+                          List.for_all f3 js
+                        )
+                        in
+                        let cond_mj = (
+                          let js = from_to 1 n in
+                          let max_2 = (maxN+1) / 2 in (* FIXME check *)
+                          let pred j = 
+                            match mm j with
+                            | None -> false
+                            | Some(mj) -> max_2 <= mj
+                          in
+                          List.for_all pred js
+                        )
+                        in
+                        let cond_s1 = (
+                          let d1 = dd 1 in
+                          let s1 = ss 1 in
+                          Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < d1)) s1)
+                        in
+                        let cond_sn = (
+                          let dn' = dd (n-1) in
+                          let sn = ss n in
+                          Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dn' <= k)) sn)
+                        in
+                        rec_clause && union_clause && cond_sj && cond_mj && cond_s1 && cond_sn
                       )
-                          
-
                   )
-              )
+              )                    
           )
       )
   )
