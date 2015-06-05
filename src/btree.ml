@@ -323,6 +323,21 @@ let trans' c0 = (
 
 NOTE: reduced the match case because we can better respect the phases of the paper *)
 
+let split_i (i,k,q,d,p) = (
+  let _ = assert (List.length d = ((List.length p)+1)) in
+  let (d',k'::d'') =
+    let ds = ins(k,i,d) in
+    take2 ds ((List.length ds)/2) in
+  let (p',p'') =
+    let ps = ins(q,i+1,p) in
+    take2 ps ((List.length d')+1)
+  in
+  let _ = assert (List.length p' = List.length d') in
+  let _ = assert (List.length p'' = List.length d'') in
+  let _ = assert ((List.length p') - (List.length p'') <=1) in
+  (d',p',k',d'',p'')
+)
+
 let trans c0 = (
   match c0 with
   | (Insert(a),r,pi,sg) -> (
@@ -347,10 +362,33 @@ let trans c0 = (
         let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
         Some(D(k,q),r,pi,sg')
     )
+    | None -> failwith "impossible: at least root in"
   )
   | (S,r,((t,i)::pi),sg) -> Some (S,r,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
-  | x -> None
+  | (D(k,q),r,(t,i)::pi,sg) ->
+     let (I(d,p)) =
+       match store_map_find sg t with
+       | Some INode inode-> inode
+       | _ -> failwith "impossible: D"
+     in
+     (match ((List.length p) < maxN) with
+     | true ->
+        let i' = INode(I(ins(k,i,d),ins(q,i+1,p))) in
+        let sg' = sg |> Store_map.add t i' in
+        Some (S,t,pi,sg')
+     | false ->
+        let (d',p',k',d'',p'') = split_i(i,k,q,d,p) in
+        let i' = INode(I(d',p'))   in
+        let i''= INode(I(d'',p'')) in
+        let q' = free_page_id sg in
+        let sg' = sg |> Store_map.add t i' |> Store_map.add q' i'' in
+        Some (S,t,pi,sg'))
   | (S,r,[],sg) -> Some (Ret,r,[],sg)
+  | (D(k,t),r,[],sg) ->
+     let q = free_page_id sg in
+     let sg' = sg |> Store_map.add q (INode(I([k],[r;t]))) in
+     Some(Ret,q,[],sg')
+  | _ -> None
 )
 
 
