@@ -104,7 +104,7 @@ let rec from_to i j = (
 
 let _ = from_to 1 5
 
-let wf_btree s0 (r,ss0,n0) h = (match h with
+let rec wf_btree s0 (r,ss0,n0) h = (match h with
     | 0 -> false
     | 1 -> (
         match store_map_find s0 r with
@@ -288,8 +288,8 @@ let free_page_id s0 = (
   in
   f1 0)
 
-
-let trans c0 = (
+(*
+let trans' c0 = (
   match c0 with
   | (c,r,pi,sg) -> (
       match c with
@@ -306,8 +306,8 @@ let trans c0 = (
                 Some(S,r,pi,Store_map.add r l' sg)
               else if List.length es < maxN then
                 let l' = LNode(L(ins(a,i,es))) in
-                Some(S,r,pi,Store_map.add r l' sg) 
-              else 
+                Some(S,r,pi,Store_map.add r l' sg)
+              else
                 let (es',k,es'') = split_l(i,a,es) in
                 let l1 = LNode(L(es')) in
                 let l2 = LNode(L(es'')) in
@@ -315,9 +315,42 @@ let trans c0 = (
                 let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
                 Some(D(k,q),r,pi,sg')
             )
-        )
+      )
       | x -> None
     )
+)
+
+
+NOTE: reduced the match case because we can better respect the phases of the paper *)
+
+let trans c0 = (
+  match c0 with
+  | (Insert(a),r,pi,sg) -> (
+    match (store_map_find sg r) with
+    | Some(INode(I(ds,ps))) -> (
+      let i = first ds (fun x -> x > entry_to_key(a)) in
+      Some(Insert(a),nth_from_1 ps i,(r,i)::pi,sg)
+    )
+    | Some(LNode(L(es))) -> (
+      let i = first es (fun x -> entry_to_key x >= entry_to_key a) in
+      if test i es (fun x -> entry_to_key x = entry_to_key a) then
+        let l' = LNode(L(replace(a,i,es))) in
+        Some(S,r,pi,Store_map.add r l' sg)
+      else if List.length es < maxN then
+        let l' = LNode(L(ins(a,i,es))) in
+        Some(S,r,pi,Store_map.add r l' sg)
+      else
+        let (es',k,es'') = split_l(i,a,es) in
+        let l1 = LNode(L(es')) in
+        let l2 = LNode(L(es'')) in
+        let q = free_page_id sg in
+        let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
+        Some(D(k,q),r,pi,sg')
+    )
+  )
+  | (S,r,((t,i)::pi),sg) -> Some (S,r,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
+  | x -> None
+  | (S,r,[],sg) -> Some (Ret,r,[],sg)
 )
 
 
