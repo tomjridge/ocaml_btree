@@ -364,7 +364,7 @@ let trans c0 = (
     )
     | None -> failwith "impossible: at least root in"
   )
-  | (S,r,((t,i)::pi),sg) -> Some (S,r,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
+  | (S,r,((t,i)::pi),sg) -> Some (S,t,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
   | (D(k,q),r,(t,i)::pi,sg) ->
      let (I(d,p)) =
        match store_map_find sg t with
@@ -382,7 +382,7 @@ let trans c0 = (
         let i''= INode(I(d'',p'')) in
         let q' = free_page_id sg in
         let sg' = sg |> Store_map.add t i' |> Store_map.add q' i'' in
-        Some (S,t,pi,sg'))
+        Some (D(k',q'),t,pi,sg'))
   | (S,r,[],sg) -> Some (Ret,r,[],sg)
   | (D(k,t),r,[],sg) ->
      let q = free_page_id sg in
@@ -401,3 +401,24 @@ let config0 = (Insert(Entry(2)),root0,[],empty_store0)
 
 let (a,b,c,d) = loop config0
 let _ = Store_map.bindings d
+
+
+let inserts_in_tree (r0,s0) l =
+  let dest_root_store (_,r,_,s) = (r,s) in
+  List.fold_left (fun (r,s) e ->  dest_root_store(loop (Insert(Entry(e)),r,[],s))) (r0,s0) l
+
+let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4]
+let _ = Store_map.bindings store_with_full_root
+
+(* actually the insertion inserts only new entries, because we are
+using the content of the entries as key value (see entry_to_key)
+let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [1;2;3;4]
+let _ = Store_map.bindings store_with_two_children *)
+
+let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5]
+let _ = Store_map.bindings store_with_two_children
+
+
+(*FIXME: problem in split_i with the asserts *)
+let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [6;7;8;9;10;11;12]
+let _ = Store_map.bindings store_with_two_inodes
