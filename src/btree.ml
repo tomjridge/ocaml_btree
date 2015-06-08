@@ -324,7 +324,7 @@ let trans' c0 = (
 NOTE: reduced the match case because we can better respect the phases of the paper *)
 
 let split_i (i,k,q,d,p) = (
-  let _ = assert (List.length d = ((List.length p)+1)) in
+  let _ = assert (List.length p = ((List.length d)+1)) in
   let (d',k'::d'') =
     let ds = ins(k,i,d) in
     take2 ds ((List.length ds)/2) in
@@ -332,8 +332,8 @@ let split_i (i,k,q,d,p) = (
     let ps = ins(q,i+1,p) in
     take2 ps ((List.length d')+1)
   in
-  let _ = assert (List.length p' = List.length d') in
-  let _ = assert (List.length p'' = List.length d'') in
+  let _ = assert (List.length p' = ((List.length d')+1)) in
+  let _ = assert (List.length p'' = ((List.length d'')+1)) in
   let _ = assert ((List.length p') - (List.length p'') <=1) in
   (d',p',k',d'',p'')
 )
@@ -418,7 +418,5 @@ let _ = Store_map.bindings store_with_two_children *)
 let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5]
 let _ = Store_map.bindings store_with_two_children
 
-
-(*FIXME: problem in split_i with the asserts *)
 let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [6;7;8;9;10;11;12]
 let _ = Store_map.bindings store_with_two_inodes
