@@ -338,7 +338,7 @@ let split_i (i,k,q,d,p) = (
   (d',p',k',d'',p'')
 )
 
-let trans c0 = (
+let insert_trans c0 = (
   match c0 with
   | (Insert(a),r,pi,sg) -> (
     match (store_map_find sg r) with
@@ -392,20 +392,20 @@ let trans c0 = (
 )
 
 
-let rec loop c0 = (
-  match trans c0 with
+let rec insert_loop c0 = (
+  match insert_trans c0 with
   | None -> c0
-  | Some c -> loop c)
+  | Some c -> insert_loop c)
 
 let config0 = (Insert(Entry(2)),root0,[],empty_store0)
 
-let (a,b,c,d) = loop config0
+let (a,b,c,d) = insert_loop config0
 let _ = Store_map.bindings d
 
 
 let inserts_in_tree (r0,s0) l =
   let dest_root_store (_,r,_,s) = (r,s) in
-  List.fold_left (fun (r,s) e ->  dest_root_store(loop (Insert(Entry(e)),r,[],s))) (r0,s0) l
+  List.fold_left (fun (r,s) e ->  dest_root_store(insert_loop (Insert(Entry(e)),r,[],s))) (r0,s0) l
 
 let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4]
 let _ = Store_map.bindings store_with_full_root
@@ -420,3 +420,31 @@ let _ = Store_map.bindings store_with_two_children
 
 let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [6;7;8;9;10;11;12]
 let _ = Store_map.bindings store_with_two_inodes
+
+
+type find_comm = Find of key | Ret of (page_id * int)
+
+type find_config = find_comm * page_id * store
+
+let find_trans (Find(k),r,sg) =
+  (match (store_map_find sg r) with
+   | Some (INode(I(ds,ps))) ->
+      let i = first ds (fun x -> x > k) in
+      let p = nth_from_1 ps i in
+      (Find(k),p,sg)
+   | Some (LNode(L(es))) ->
+      let i = first es (fun x -> (entry_to_key x) >= k) in
+      (Ret(r,i),r,sg)
+   | None -> failwith "find: invalid root")
+
+let rec find_loop c0 = (
+  match find_trans c0 with
+  | (Ret (r,i), _, sg) ->
+     (match (store_map_find sg r) with
+     | None -> None
+     | Some(LNode(L(qs))) -> try Some(nth_from_1 qs i) with _ -> None
+     | _ -> failwith "impossible: inode should not be returned")
+  | c -> find_loop c)
+
+let find_config0 = Find(Key 52), root'' , store_with_two_inodes
+let entry  = find_loop find_config0
