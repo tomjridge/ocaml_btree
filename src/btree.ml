@@ -186,8 +186,8 @@ let rec wf_btree s0 (r,ss0,n0) h = (match h with
                               true
                             else
                               let sj = ss j in
-                              let dj = dd j in
-                              let dj' = dd (j+1) in
+                              let dj = dd (j-1) in
+                              let dj' = dd j in
                               Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj  (* NB use of ocaml <= for type key *)
                               && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj
                           in
@@ -433,16 +433,15 @@ let _ = Store_map.bindings store_with_full_root
 
 let _ = wf_btree store_with_full_root (root,(get_set_entries store_with_full_root),4) 1
 
-let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5;6;]
+let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5;6]
 let _ = Store_map.bindings store_with_two_children
 
 let _ = wf_btree store_with_two_children (root',(get_set_entries store_with_two_children),2) 2
 
-
 let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [7;8;9]
 let _ = Store_map.bindings store_with_two_inodes
 
-let _ = wf_btree store_with_two_inodes (root'',(get_set_entries store_with_two_inodes),3) 2
+let _ = wf_btree store_with_two_inodes (root'',(get_set_entries store_with_two_inodes),4) 2
 (* end tests *)
 
 type find_comm = Find of key | Ret of (page_id * int)
