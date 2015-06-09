@@ -407,13 +407,9 @@ let inserts_in_tree (r0,s0) l =
   let dest_root_store (_,r,_,s) = (r,s) in
   List.fold_left (fun (r,s) e ->  dest_root_store(insert_loop (Insert(Entry(e)),r,[],s))) (r0,s0) l
 
+(* tests *)
 let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4]
 let _ = Store_map.bindings store_with_full_root
-
-(* actually the insertion inserts only new entries, because we are
-using the content of the entries as key value (see entry_to_key)
-let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [1;2;3;4]
-let _ = Store_map.bindings store_with_two_children *)
 
 let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5]
 let _ = Store_map.bindings store_with_two_children
@@ -421,6 +417,10 @@ let _ = Store_map.bindings store_with_two_children
 let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [6;7;8;9;10;11;12]
 let _ = Store_map.bindings store_with_two_inodes
 
+let (root'',store_with_two_inodes) = inserts_in_tree (root'',store_with_two_inodes) [13;14;15;16]
+let _ = Store_map.bindings store_with_two_inodes
+
+(* end tests *)
 
 type find_comm = Find of key | Ret of (page_id * int)
 
