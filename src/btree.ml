@@ -99,9 +99,14 @@ let nth_from_1 xs i = List.nth xs (i-1)
 
 (* a list containing i..j; hacky *)
 let rec from_to i j = (
-  if i=j then [i] else i::(from_to (i+1) j)
+  if i=j then [i]
+  else
+    if i<j
+    then i::(from_to (i+1) j)
+    else []
 )
 
+let _ = from_to 1 0
 let _ = from_to 1 5
 
 let rec wf_btree s0 (r,ss0,n0) h = (match h with
@@ -170,17 +175,13 @@ let rec wf_btree s0 (r,ss0,n0) h = (match h with
                           Entry_set.equal ss0 union
                         in
                         let cond_sj = (
-                          let js = from_to 1 (n-1) in
+                          let js = from_to 1 (n-2) in
                           let f3 j =
-                            if j = 1 || (j+1) = n then
-                              (* these cases are covered by later predicates *)
-                              true
-                            else
-                              let sj = ss j in
-                              let dj = dd (j-1) in
-                              let dj' = dd j in
-                              Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj  (* NB use of ocaml <= for type key *)
-                              && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj
+                            let sj' = ss (j+1) in
+                            let dj  = dd j     in
+                            let dj' = dd (j+1) in
+                            Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj'  (* NB use of ocaml <= for type key *)
+                            && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj'
                           in
                           List.for_all f3 js
                         )
