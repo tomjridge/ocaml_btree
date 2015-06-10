@@ -2,15 +2,6 @@ type entry = Entry of int
 type page_id = Page_id of int
 type key = Key of int
 
-type ty_ops = {
-    (* less than on keys *)
-    k_lt      : key -> key -> bool;
-    (* a function that returns a key from a given entry*)
-    e2k       : entry -> key;
-    (* a page_id comparison *)
-    p_compare : page_id -> page_id -> int;
-  }
-
 let maxN = 4
 
 type inode = I of (key list * page_id list)
@@ -442,6 +433,12 @@ let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_child
 let _ = Store_map.bindings store_with_two_inodes
 
 let _ = wf_btree store_with_two_inodes (root'',(get_set_entries store_with_two_inodes),4) 2
+
+let (root''',store_with_three_inodes) = inserts_in_tree (root'',store_with_two_inodes) [10;11;12;13;14;15;16]
+let _ = Store_map.bindings store_with_three_inodes
+
+let _ = wf_btree store_with_three_inodes (root''',(get_set_entries store_with_three_inodes),2) 3
+
 (* end tests *)
 
 type find_comm = Find of key | Ret of (page_id * int)
