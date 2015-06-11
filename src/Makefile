@@ -1,9 +1,7 @@
+all: build_lem
 
-
-all: build
-
-build:
-	ocamlc btree.ml -o btree
+build_lem:
+	../../lem/lem btree.lem
 
 build_with_bisect:
 	ocamlfind ocamlc \
