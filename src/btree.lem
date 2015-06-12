@@ -40,8 +40,94 @@ module Utility = struct
         if i<j
         then i::(from_to (i+1) j)
         else []
-)
+    )
+
+    (* find the first index of [l] satisfying a predicate [p] *)
+    val first_helper : forall 'a.
+       list 'a ->
+       ('a -> bool) ->
+       nat ->
+       nat
+    let rec first_helper xs p i =
+      if i <= List.length xs then
+        if p (nth_from_1 xs i) then i else first_helper xs p (i+1)
+      else
+        (List.length xs) + 1
+
+    val first : forall 'a.
+       list 'a ->
+       ('a -> bool) ->
+       nat
+    let first xs p = (
+      first_helper xs p 1
+    )
+
+    (* it checks that predicate [p] on the [k]th element of [xs] *)
+    val test : forall 'a.
+       nat ->
+       list 'a ->
+       ('a -> bool) ->
+       bool
+    let test k xs p = (
+      if (1 <= k && k <= List.length xs) then
+        p (nth_from_1 xs k)
+      else false
+    )
+
+  (* [replace] updates the value of [xs] at
+                        index [i] with the new value [a] *)
+    val replace : forall 'a.
+       ('a * nat * list 'a ) ->
+       list 'a
+    let rec replace (a,i,es) = (
+      match i with
+      | 0 -> failwith "replace: 0"
+      | 1 -> (
+        match es with
+        | [] -> failwith "replace: es = []"
+        | _::xs -> a::xs
+        end)
+      | _ -> (
+        match es with
+        | [] -> failwith "replace: es = [] 2"
+        | e::es -> e::replace(a,i-1,es)
+        end)
+     end)
+
+    (* [ins] adds a new value [a] at the index [i] of [xs] *)
+    val ins : forall 'a.
+       ('a * nat * list 'a ) ->
+       list 'a
+    let rec ins (a,i,xs) = (
+      match i with
+      | 0 -> failwith "ins: 0"
+      | 1 -> a::xs
+      | _ -> (
+        match xs with
+        | [] -> failwith "ins: []"
+        | x::xs -> x::(ins (a,i-1,xs))
+        end)
+      end)
+
+    (* [take2] divides the list in two sublists at index [n] *)
+    val take2 : forall 'a.
+       list 'a ->
+       nat ->
+       (list 'a * list 'a)
+    let take2 xs n = (
+      match n with
+      | 0 -> ([],xs)
+      | _ -> (
+        match xs with
+        | [] -> ([],[])
+        | x::xs -> (
+            let (b,c) = (take2 xs (n-1)) in
+            ((x::b),c))
+        end)
+      end)
+
 end
+
 module Fs_impl_types = struct
     open Utility
 
@@ -61,7 +147,7 @@ module Fs_impl_types = struct
     (* a store represents the actual content of the disk *)
     type store 'p 'e 'k = map (page_id 'p) (node 'p 'e 'k)
 
-    type env 'e 'k =
+    type env 'p 'e 'k =
       <|
         (* fanout of the btree *)
         fanout: nat;
@@ -69,11 +155,13 @@ module Fs_impl_types = struct
         entry_to_key: entry 'e -> key 'k;
         (* less than on keys *)
         key_lt : key 'k -> key 'k -> bool;
+        (* get free page_id in store *)
+        free_page_id : store 'p 'e 'k -> page_id 'p
       |>
 
 
-    val key_eq : forall 'e 'k.
-      env 'e 'k ->
+    val key_eq : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
@@ -81,24 +169,24 @@ module Fs_impl_types = struct
       not(env.key_lt k1 k2)
       && not(env.key_lt k2 k1)
 
-    val key_lte : forall 'e 'k.
-      env 'e 'k ->
+    val key_lte : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
     let key_lte env k1 k2 =
       env.key_lt k1 k2 || key_eq env k1 k2
 
-    val entry_lt : forall 'e 'k.
-      env 'e 'k ->
+    val entry_lt : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
     let entry_lt env e1 e2 =
       env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)
 
-    val entry_eq : forall 'e 'k.
-      env 'e 'k ->
+    val entry_eq : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
@@ -107,21 +195,31 @@ module Fs_impl_types = struct
       &&
         (not (env.key_lt (env.entry_to_key e2) (env.entry_to_key e1)))
 
-    val entry_lte : forall 'e 'k.
-      env 'e 'k ->
+    val entry_lte : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
     let entry_lte env e1 e2 =
       entry_lt env e1 e2 || entry_eq env e1 e2
+
+
+    (* insertion types *)
+    type ins_comm 'p 'e 'k = Insert of entry 'e | S | D of (key 'k * page_id 'p) | Ret
+
+    type ins_config 'p 'e 'k = ins_comm 'p 'e 'k * page_id 'p * (list (page_id 'p * nat)) * store 'p 'e 'k
+
+    (* find types *)
+    type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
+    type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
 end
 
 module BTree = struct
     open Fs_impl_types
     open Utility
 
-    val sorted_entry_list : forall 'e 'k.
-      env 'e 'k ->
+    val sorted_entry_list : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       list (entry 'e) ->
       bool
     let sorted_entry_list env es =
@@ -177,9 +275,12 @@ module BTree = struct
         end)
       end)
 
+
+    (* Well formedness *)
+
     (* [wf_btree] defines the invariants of a btree *)
     val wf_btree : forall 'p 'k 'e.
-      env 'e 'k ->
+      env 'p 'e 'k ->
       store 'p 'e 'k ->
       (page_id 'p * set (entry 'e) * nat) ->
       nat ->
@@ -227,7 +328,7 @@ module BTree = struct
                        relation to maxN? *)
                 match ds with
                 | [] -> false
-                | d1::_ -> (
+                | _::_ -> (
                   let n = n0 in
                   let qq i = nth_from_1 qs i in
                   let ss i = entry_set s0 (qq i) in
@@ -289,4 +390,125 @@ module BTree = struct
             end)
           end)
                                             end)
+
+    (* section 3: insertion as abstract machine rules *)
+
+    (* [split_l] divides a leaf node contents [es] in two leaves
+    separated by a key *)
+    val split_l : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       (nat * entry 'e * list (entry 'e) ) ->
+       (list (entry 'e) * key 'k * list (entry 'e) )
+    let split_l env (i,a,es0) = (
+      let es = ins (a,i,es0) in
+      let (es',es'') = take2 es (List.length es / 2 ) in
+      let k = (
+        match es'' with
+        | [] -> failwith "impossible split_l"
+        | e::_ -> env.entry_to_key e
+        end)
+      in
+      (es',k,es''))
+
+    val split_i : forall 'p 'e 'k.
+      (nat * key 'k * page_id 'p * list (key 'k) * list (page_id 'p)) ->
+      (list (key 'k) *  list (page_id 'p) * key 'k * list (key 'k) *  list (page_id 'p) )
+    let split_i (i,k,q,d,p) = (
+      let _ = (List.length p = ((List.length d) + 1)) in
+      let (d',k'::d'') =
+        let ds = ins (k,i,d) in
+        take2 ds ((List.length ds)/2)
+      in
+      let (p',p'') =
+        let ps = ins (q,i+1,p) in
+        take2 ps ((List.length d')+1)
+      in
+      let _ = (List.length p' = ((List.length d')+1)) in
+      let _ = (List.length p'' = ((List.length d'')+1)) in
+      let _ = ((List.length p') - (List.length p'') <=1) in
+      (d',p',k',d'',p'')
+    )
+
+    (* insertion *)
+    val insert_trans : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       ins_config 'p 'e 'k ->
+       maybe (ins_config 'p 'e 'k)
+    let insert_trans env c0 = (
+      match c0 with
+      | (Insert a,r,pi,sg) -> (
+        match (Map.lookup r sg) with
+        | Just (INode(I(ds,ps))) -> (
+          let i = first ds (fun x -> env.key_lt (env.entry_to_key a) x) in
+          Just(Insert a, nth_from_1 ps i,(r,i)::pi,sg)
+        )
+        | Just (LNode(L(es))) -> (
+          let i = first es (fun x -> key_lte env (env.entry_to_key a) (env.entry_to_key x)) in
+          if test i es (fun x -> key_eq env (env.entry_to_key a) (env.entry_to_key x)) then
+            let l' = LNode(L(replace(a,i,es))) in
+            Just(S,r,pi, Map.insert r l' sg)
+          else if List.length es < env.fanout then
+            let l' = LNode(L(ins(a,i,es))) in
+            Just(S,r,pi, Map.insert r l' sg)
+          else
+            let (es',k,es'') = split_l env (i,a,es) in
+            let l1 = LNode(L(es')) in
+            let l2 = LNode(L(es'')) in
+            let q = env.free_page_id sg in
+            let sg' = Map.insert q l2 (Map.insert r l1 sg) in
+            Just(D(k,q),r,pi,sg'))
+        | Nothing -> failwith "impossible: at least root in"
+        end)
+      | (S,_,((t,_)::pi),sg) -> Just (S,t,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
+      | (D(k,q),_,(t,i)::pi,sg) -> (
+        let (I(d,p)) = (
+          match Map.lookup t sg with
+          | Just (INode inode) -> inode
+          | _ -> failwith "impossible: D"
+          end)
+        in
+        (match ((List.length p) < env.fanout) with
+         | true ->
+            let i' = INode(I(ins(k,i,d),ins(q,i+1,p))) in
+            let sg' = Map.insert t i' sg in
+            Just (S,t,pi,sg')
+         | false ->
+            let (d',p',k',d'',p'') = split_i(i,k,q,d,p) in
+            let i'  = INode(I(d',p'))   in
+            let i'' = INode(I(d'',p'')) in
+            let q' = env.free_page_id sg in
+            let sg' = Map.insert q' i'' (Map.insert t i' sg) in
+            Just (D(k',q'),t,pi,sg')
+         end)
+      )
+      | (S,r,[],sg) -> Just (Ret,r,[],sg)
+      | (D(k,t),r,[],sg) ->
+         let q = env.free_page_id sg in
+         let i' = (INode(I([k],[r;t]))) in
+         let sg' = Map.insert q i' sg in
+         Just(Ret,q,[],sg')
+      | _ -> Nothing
+      end)
+
+    val insert_loop : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       ins_config 'p 'e 'k ->
+       ins_config 'p 'e 'k
+    let rec insert_loop env c0 = (
+      match insert_trans env c0 with
+      | Nothing -> c0
+      | Just c -> insert_loop env c
+      end)
+
+    val inserts_in_tree : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       (page_id 'p * store 'p 'e 'k) ->
+       list (entry 'e) ->
+       (page_id 'p * store 'p 'e 'k)
+    let inserts_in_tree env (r0,s0) l =
+      let dest_root_store (_,r,_,s) = (r,s) in
+      List.foldl (fun (r,s) e ->  dest_root_store(insert_loop env (Insert(e),r,[],s))) (r0,s0) l
+
+    (* section 4: find as abstract machine rules *)
+    let find_trans = true
 end
