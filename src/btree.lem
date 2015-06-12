@@ -114,7 +114,7 @@ module Utility = struct
        list 'a ->
        nat ->
        (list 'a * list 'a)
-    let take2 xs n = (
+    let rec take2 xs n = (
       match n with
       | 0 -> ([],xs)
       | _ -> (
@@ -530,7 +530,7 @@ module BTree = struct
        env 'p 'e 'k ->
        find_config 'p 'e 'k ->
        maybe (entry 'e)
-    let find_loop env c0 = (
+    let rec find_loop env c0 = (
       match find_trans env c0 with
       | (F_Ret(r,i),_,sg) -> (
         match Map.lookup r sg with
