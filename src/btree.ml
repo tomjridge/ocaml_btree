@@ -13,7 +13,7 @@ module Page_id_order (* : Map.OrderedType with type t = page_id *) = struct
 
   type t = page_id
 
-  let compare = (Pervasives.compare: t-> t -> int)
+  let compare = (Pervasives.compare: t -> t -> int)
 
 end
 
@@ -99,12 +99,17 @@ let nth_from_1 xs i = List.nth xs (i-1)
 
 (* a list containing i..j; hacky *)
 let rec from_to i j = (
-  if i=j then [i] else i::(from_to (i+1) j)
+  if i=j then [i]
+  else
+    if i<j
+    then i::(from_to (i+1) j)
+    else []
 )
 
+let _ = from_to 1 0
 let _ = from_to 1 5
 
-let wf_btree s0 (r,ss0,n0) h = (match h with
+let rec wf_btree s0 (r,ss0,n0) h = (match h with
     | 0 -> false
     | 1 -> (
         match store_map_find s0 r with
@@ -128,7 +133,7 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
           )
       )
     | h_plus_one -> (
-        let h = h_plus_one -1 in
+        let h = h_plus_one - 1 in
         match store_map_find s0 r with
         | None -> false
         | Some(node) -> (
@@ -155,8 +160,8 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
                         let ss i = i |> qq |> (entry_set s0) in
                         let mm i = i |> qq |> (get_m s0) in
                         let dd i = nth_from_1 ds i in
-                        let rec_clause = 
-                          let pred i = 
+                        let rec_clause =
+                          let pred i =
                             let (qi,si,mi) = (qq i, ss i, mm i) in
                             match mi with
                             | None -> false
@@ -164,19 +169,19 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
                           in
                           List.for_all pred (from_to 1 n)
                         in
-                        let union_clause = 
+                        let union_clause =
                           (* check S = S_1 Un ... *)
                           let union = (from_to 1 n) |> List.map ss |> union_list_of_entry_set in
                           Entry_set.equal ss0 union
                         in
                         let cond_sj = (
-                          let js = from_to 1 (n-1) in
-                          let f3 j = 
-                            let sj = ss j in
-                            let dj = dd j in
+                          let js = from_to 1 (n-2) in
+                          let f3 j =
+                            let sj' = ss (j+1) in
+                            let dj  = dd j     in
                             let dj' = dd (j+1) in
-                            Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj  (* NB use of ocaml <= for type key *)
-                            && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj
+                            Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> dj <= k)) sj'  (* NB use of ocaml <= for type key *)
+                            && Entry_set.for_all (fun s -> s |> entry_to_key |> (fun k -> k < dj')) sj'
                           in
                           List.for_all f3 js
                         )
@@ -184,7 +189,7 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
                         let cond_mj = (
                           let js = from_to 1 n in
                           let max_2 = (maxN+1) / 2 in (* FIXME check *)
-                          let pred j = 
+                          let pred j =
                             match mm j with
                             | None -> false
                             | Some(mj) -> max_2 <= mj
@@ -205,7 +210,7 @@ let wf_btree s0 (r,ss0,n0) h = (match h with
                         rec_clause && union_clause && cond_sj && cond_mj && cond_s1 && cond_sn
                       )
                   )
-              )                    
+              )
           )
       )
   )
@@ -223,8 +228,8 @@ type config = ins_comm * page_id * ((page_id * int)list) * store
 let initial_config a (r,s) = (Insert(a),r,[],s)
 
 let first xs p = (
-  let rec f1 i = 
-    if i <= List.length xs then 
+  let rec f1 i =
+    if i <= List.length xs then
       if p (nth_from_1 xs i) then i else f1 (i+1)
     else
       List.length xs + 1
@@ -232,7 +237,7 @@ let first xs p = (
   f1 1)
 
 let _ = first [1;2;3] (fun x -> x=5)
-  
+
 let test k xs p = (
   if (1 <= k && k <= List.length xs) then
     p (nth_from_1 xs k)
@@ -240,7 +245,7 @@ let test k xs p = (
     false)
 
 let rec replace(a,i,es) = (
-  match i with 
+  match i with
   | 0 -> failwith "replace: 0"
   | 1 -> (
       match es with
@@ -252,7 +257,7 @@ let rec replace(a,i,es) = (
       | e::es -> e::replace(a,i-1,es)))
 
 let rec ins (a,i,xs) = (
-  match i with 
+  match i with
   | 0 -> failwith "ins: 0"
   | 1 -> a::xs
   | _ -> (
@@ -288,8 +293,8 @@ let free_page_id s0 = (
   in
   f1 0)
 
-
-let trans c0 = (
+(*
+let trans' c0 = (
   match c0 with
   | (c,r,pi,sg) -> (
       match c with
@@ -306,8 +311,8 @@ let trans c0 = (
                 Some(S,r,pi,Store_map.add r l' sg)
               else if List.length es < maxN then
                 let l' = LNode(L(ins(a,i,es))) in
-                Some(S,r,pi,Store_map.add r l' sg) 
-              else 
+                Some(S,r,pi,Store_map.add r l' sg)
+              else
                 let (es',k,es'') = split_l(i,a,es) in
                 let l1 = LNode(L(es')) in
                 let l2 = LNode(L(es'')) in
@@ -315,18 +320,151 @@ let trans c0 = (
                 let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
                 Some(D(k,q),r,pi,sg')
             )
-        )
+      )
       | x -> None
     )
 )
 
 
-let rec loop c0 = (
-  match trans c0 with
+NOTE: reduced the match case because we can better respect the phases of the paper *)
+
+let split_i (i,k,q,d,p) = (
+  let _ = assert (List.length p = ((List.length d)+1)) in
+  let (d',k'::d'') =
+    let ds = ins(k,i,d) in
+    take2 ds ((List.length ds)/2) in
+  let (p',p'') =
+    let ps = ins(q,i+1,p) in
+    take2 ps ((List.length d')+1)
+  in
+  let _ = assert (List.length p' = ((List.length d')+1)) in
+  let _ = assert (List.length p'' = ((List.length d'')+1)) in
+  let _ = assert ((List.length p') - (List.length p'') <=1) in
+  (d',p',k',d'',p'')
+)
+
+let insert_trans c0 = (
+  match c0 with
+  | (Insert(a),r,pi,sg) -> (
+    match (store_map_find sg r) with
+    | Some(INode(I(ds,ps))) -> (
+      let i = first ds (fun x -> x > entry_to_key(a)) in
+      Some(Insert(a),nth_from_1 ps i,(r,i)::pi,sg)
+    )
+    | Some(LNode(L(es))) -> (
+      let i = first es (fun x -> entry_to_key x >= entry_to_key a) in
+      if test i es (fun x -> entry_to_key x = entry_to_key a) then
+        let l' = LNode(L(replace(a,i,es))) in
+        Some(S,r,pi,Store_map.add r l' sg)
+      else if List.length es < maxN then
+        let l' = LNode(L(ins(a,i,es))) in
+        Some(S,r,pi,Store_map.add r l' sg)
+      else
+        let (es',k,es'') = split_l(i,a,es) in
+        let l1 = LNode(L(es')) in
+        let l2 = LNode(L(es'')) in
+        let q = free_page_id sg in
+        let sg' = sg |> Store_map.add r l1 |> Store_map.add q l2 in
+        Some(D(k,q),r,pi,sg')
+    )
+    | None -> failwith "impossible: at least root in"
+  )
+  | (S,r,((t,i)::pi),sg) -> Some (S,t,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
+  | (D(k,q),r,(t,i)::pi,sg) ->
+     let (I(d,p)) =
+       match store_map_find sg t with
+       | Some INode inode-> inode
+       | _ -> failwith "impossible: D"
+     in
+     (match ((List.length p) < maxN) with
+     | true ->
+        let i' = INode(I(ins(k,i,d),ins(q,i+1,p))) in
+        let sg' = sg |> Store_map.add t i' in
+        Some (S,t,pi,sg')
+     | false ->
+        let (d',p',k',d'',p'') = split_i(i,k,q,d,p) in
+        let i' = INode(I(d',p'))   in
+        let i''= INode(I(d'',p'')) in
+        let q' = free_page_id sg in
+        let sg' = sg |> Store_map.add t i' |> Store_map.add q' i'' in
+        Some (D(k',q'),t,pi,sg'))
+  | (S,r,[],sg) -> Some (Ret,r,[],sg)
+  | (D(k,t),r,[],sg) ->
+     let q = free_page_id sg in
+     let sg' = sg |> Store_map.add q (INode(I([k],[r;t]))) in
+     Some(Ret,q,[],sg')
+  | _ -> None
+)
+
+
+let rec insert_loop c0 = (
+  match insert_trans c0 with
   | None -> c0
-  | Some c -> loop c)
+  | Some c -> insert_loop c)
 
 let config0 = (Insert(Entry(2)),root0,[],empty_store0)
 
-let (a,b,c,d) = loop config0
+let (a,b,c,d) = insert_loop config0
 let _ = Store_map.bindings d
+
+
+let inserts_in_tree (r0,s0) l =
+  let dest_root_store (_,r,_,s) = (r,s) in
+  List.fold_left (fun (r,s) e ->  dest_root_store(insert_loop (Insert(Entry(e)),r,[],s))) (r0,s0) l
+
+(* tests *)
+let get_set_entries sg =
+  Entry_set.of_list (
+      List.fold_left
+        (fun acc (_,n) -> match n with | LNode(L(es)) -> acc @ es | _ -> acc)
+        []
+        (Store_map.bindings sg))
+
+let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4]
+let _ = Store_map.bindings store_with_full_root
+
+let _ = wf_btree store_with_full_root (root,(get_set_entries store_with_full_root),4) 1
+
+let (root',store_with_two_children) = inserts_in_tree (root,store_with_full_root) [5;6]
+let _ = Store_map.bindings store_with_two_children
+
+let _ = wf_btree store_with_two_children (root',(get_set_entries store_with_two_children),2) 2
+
+let (root'',store_with_two_inodes) = inserts_in_tree (root',store_with_two_children) [7;8;9]
+let _ = Store_map.bindings store_with_two_inodes
+
+let _ = wf_btree store_with_two_inodes (root'',(get_set_entries store_with_two_inodes),4) 2
+
+let (root''',store_with_three_inodes) = inserts_in_tree (root'',store_with_two_inodes) [10;11;12;13;14;15;16]
+let _ = Store_map.bindings store_with_three_inodes
+
+let _ = wf_btree store_with_three_inodes (root''',(get_set_entries store_with_three_inodes),2) 3
+
+(* end tests *)
+
+type find_comm = Find of key | Ret of (page_id * int)
+
+type find_config = find_comm * page_id * store
+
+let find_trans (Find(k),r,sg) =
+  (match (store_map_find sg r) with
+   | Some (INode(I(ds,ps))) ->
+      let i = first ds (fun x -> x > k) in
+      let p = nth_from_1 ps i in
+      (Find(k),p,sg)
+   | Some (LNode(L(es))) ->
+      let i = first es (fun x -> (entry_to_key x) >= k) in
+      (Ret(r,i),r,sg)
+   | None -> failwith "find: invalid root")
+
+let rec find_loop c0 = (
+  match find_trans c0 with
+  | (Ret (r,i), _, sg) ->
+     (match (store_map_find sg r) with
+     | None -> None
+     | Some(LNode(L(qs))) -> try Some(nth_from_1 qs i) with _ -> None
+     | _ -> failwith "impossible: inode should not be returned")
+  | c -> find_loop c)
+
+let find_config0 = Find(Key 52), root'' , store_with_two_inodes
+let entry  = find_loop find_config0

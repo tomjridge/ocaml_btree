@@ -1,0 +1,292 @@
+open import Pervasives Assert_extra
+
+module Utility = struct
+
+    (* insertion sort taken from https://ocaml.org/learn/taste.html*)
+    let rec s_insert f elem l = (
+      match l with
+      | [] -> [elem]
+      | x :: l ->
+         if (f elem x)
+         then (elem :: x :: l)
+         else (x :: (s_insert f elem l))
+      end)
+
+    let rec sort f l = (
+      match l with
+      | [] -> []
+      | x :: l -> s_insert f x (sort f l)
+      end)
+
+    (* nth_from_1 xs 1 is the first elt of xs - we count from 1 not 0 *)
+    val nth_from_1 : forall 'a.
+      list 'a ->
+      nat ->
+      'a
+    let nth_from_1 xs i =
+      (match index xs (i-1) with
+      | Just el -> el
+      | _ -> failwith "nth_from_1"
+       end)
+
+    (* a list containing i..j; hacky *)
+    val from_to :
+      nat ->
+      nat ->
+      list nat
+    let rec from_to i j = (
+      if i=j then [i]
+      else
+        if i<j
+        then i::(from_to (i+1) j)
+        else []
+)
+end
+module Fs_impl_types = struct
+    open Utility
+
+    (*FIXME all these types need to become abstract *)
+    (* an abstract of btree content *)
+    type entry 'entry = Entry of 'entry
+    (* a pointer to a node on disk *)
+    type page_id 'p_id = Page_id of 'p_id
+    (* the keys of the internal nodes *)
+    type key 'k = Key of 'k
+    (* the inode contains pointers to nodes on disks divided by keys *)
+    type inode 'k 'p = I of (list (key 'k) * list (page_id 'p))
+    (* the lnode contains only entries *)
+    type lnode 'e = L of (list (entry 'e))
+    type node 'p 'e 'k = INode of (inode 'k 'p) | LNode of (lnode 'e)
+
+    (* a store represents the actual content of the disk *)
+    type store 'p 'e 'k = map (page_id 'p) (node 'p 'e 'k)
+
+    type env 'e 'k =
+      <|
+        (* fanout of the btree *)
+        fanout: nat;
+        (* entry to key *)
+        entry_to_key: entry 'e -> key 'k;
+        (* less than on keys *)
+        key_lt : key 'k -> key 'k -> bool;
+      |>
+
+
+    val key_eq : forall 'e 'k.
+      env 'e 'k ->
+      key 'k ->
+      key 'k ->
+      bool
+    let key_eq env k1 k2 =
+      not(env.key_lt k1 k2)
+      && not(env.key_lt k2 k1)
+
+    val key_lte : forall 'e 'k.
+      env 'e 'k ->
+      key 'k ->
+      key 'k ->
+      bool
+    let key_lte env k1 k2 =
+      env.key_lt k1 k2 || key_eq env k1 k2
+
+    val entry_lt : forall 'e 'k.
+      env 'e 'k ->
+      entry 'e ->
+      entry 'e ->
+      bool
+    let entry_lt env e1 e2 =
+      env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)
+
+    val entry_eq : forall 'e 'k.
+      env 'e 'k ->
+      entry 'e ->
+      entry 'e ->
+      bool
+    let entry_eq env e1 e2 =
+      (not (env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)))
+      &&
+        (not (env.key_lt (env.entry_to_key e2) (env.entry_to_key e1)))
+
+    val entry_lte : forall 'e 'k.
+      env 'e 'k ->
+      entry 'e ->
+      entry 'e ->
+      bool
+    let entry_lte env e1 e2 =
+      entry_lt env e1 e2 || entry_eq env e1 e2
+end
+
+module BTree = struct
+    open Fs_impl_types
+    open Utility
+
+    val sorted_entry_list : forall 'e 'k.
+      env 'e 'k ->
+      list (entry 'e) ->
+      bool
+    let sorted_entry_list env es =
+      let f1 i =
+        let sorted_es = sort (entry_lt env) es in
+        let s_e = index sorted_es i in
+        let e = index es i in
+        (match (s_e,e) with
+        | (Just s_e, Just e) -> entry_eq env s_e e
+        | _ -> false
+         end)
+      in
+      (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
+
+    val union_list_of_entry_set : forall 'e.
+      list (set (entry 'e)) ->
+      set (entry 'e)
+    let union_list_of_entry_set xs =
+      let f1 sofar acc = (union) sofar acc in
+      List.foldl f1 empty xs
+
+    (* set of all entries contained in the subtree of the inode
+    pointed by [r] in the store [s0] *)
+    val entry_set : forall 'p 'e 'k.
+      store 'p 'e 'k ->
+      page_id 'p ->
+      set (entry 'e)
+    let rec entry_set s0 r = (
+      match Map.lookup r s0 with
+      | Nothing -> empty
+      | Just node -> (
+        match node with
+        | LNode(L(es)) -> Set.fromList es
+        | INode(I(_,qs)) -> (
+          let sets_of_entries = (List.map (entry_set s0) qs) in
+          (union_list_of_entry_set sets_of_entries)
+        )
+        end)
+      end)
+
+    (* [get_m] returns the size of the node pointed by [r] in [s0] *)
+    val get_m: forall 'p 'k 'e.
+      store 'p 'e 'k ->
+      page_id 'p ->
+      maybe nat
+    let get_m s0 r = (
+      match Map.lookup r s0 with
+      | Nothing -> Nothing
+      | Just node -> (
+        match node with
+        | LNode(L(es))   -> Just (List.length es)
+        | INode(I(_,qs)) -> Just (List.length qs)
+        end)
+      end)
+
+    (* [wf_btree] defines the invariants of a btree *)
+    val wf_btree : forall 'p 'k 'e.
+      env 'e 'k ->
+      store 'p 'e 'k ->
+      (page_id 'p * set (entry 'e) * nat) ->
+      nat ->
+      bool
+    let rec wf_btree env s0 (r,ss0,n0) h = (match h with
+        | 0 -> false
+        | 1 -> (
+          match Map.lookup r s0 with
+          | Nothing -> false
+          | Just node -> (
+            match node with
+            | INode _ -> false
+            | LNode (L(es)) -> (
+              let n = List.length es in
+              match (n = 0) && (n <= env.fanout) with
+              | false -> false
+              | true -> (
+                (* construct a set of entries from es *)
+                let ss' = Set.fromList es in
+                match setEqual ss0 ss' with
+                | false -> false
+                | true -> (sorted_entry_list env es)
+                end)
+              end)
+            end)
+          end)
+        | h_plus_one -> (
+          let h = h_plus_one - 1 in
+          match Map.lookup r s0 with
+          | Nothing -> false
+          | Just node -> (
+            match node with
+            | LNode _ -> false
+            | INode(I(ds,qs)) -> (
+              match (n0 = List.length qs) && (List.length ds + 1 = List.length qs) with
+              | false -> false
+              | true -> (
+                (* do we know length n0 ~= 0 or 1? n0 cannot be 0, because it is 1 bigger than |ds| *)
+                (* "minimum occupancy of each child node to be at
+                       least half its maximum capacity (maxN)" - FIXME is
+                       this true if n=1? *)
+                (* the predicate mentions d1, which means that ds can't be []; this implies that n >= 2 *)
+                (* FIXME but for btrees don't we need some
+                       properties of the number of keys in each node in
+                       relation to maxN? *)
+                match ds with
+                | [] -> false
+                | d1::_ -> (
+                  let n = n0 in
+                  let qq i = nth_from_1 qs i in
+                  let ss i = entry_set s0 (qq i) in
+                  let mm i = get_m s0 (qq i) in
+                  let dd i = nth_from_1 ds i in
+                  let rec_clause =
+                    let pred i =
+                      let (qi,si,mi) = (qq i, ss i, mm i) in
+                      (match mi with
+                      | Nothing -> false
+                      | Just mi -> (wf_btree env s0 (qi,si,mi) h)
+                       end)
+                    in
+                    List.all pred (from_to 1 n)
+                  in
+                  let union_clause =
+                    (* check S = S_1 Un ... *)
+                    let union' = union_list_of_entry_set (List.map ss (from_to 1 n)) in
+                    setEqual ss0 union'
+                  in
+                  let cond_sj = (
+                    let js = from_to 1 (n-2) in
+                    let f3 j =
+                      let sj' = ss (j+1) in
+                      let dj  = dd j     in
+                      let dj' = dd (j+1) in
+                      Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
+                      &&
+                        Set.all (fun s -> env.key_lt (env.entry_to_key s) dj') sj'
+                    in
+                    List.all f3 js
+                  )
+                  in
+                  let cond_mj = (
+                    let js = from_to 1 n in
+                    let max_2 = (env.fanout + 1) / 2 in
+                    let pred j =
+                      (match mm j with
+                      | Nothing -> false
+                      | Just mj -> max_2 <= mj
+                       end)
+                    in
+                    List.all pred js
+                  )
+                  in
+                  let cond_s1 = (
+                    let d1 = dd 1 in
+                    let s1 = ss 1 in
+                    Set.all (fun s -> env.key_lt (env.entry_to_key s) d1 ) s1)
+                  in
+                  let cond_sn = (
+                    let dn' = dd (n-1) in
+                    let sn = ss n in
+                    Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn)
+                  in
+                  rec_clause && union_clause && cond_sj && cond_mj && cond_s1 && cond_sn)
+                end)
+              end)
+            end)
+          end)
+                                            end)
+end
