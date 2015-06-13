@@ -188,6 +188,14 @@ module Fs_impl_types = struct
         free_page_id : store 'p 'e 'k -> page_id 'p
       |>
 
+    val nat_env: env nat nat nat
+    let nat_env =
+      <|
+        fanout = 4;
+        entry_to_key = (fun (Entry e) -> Key e);
+        key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
+        free_page_id = (fun store -> match (Set.findMax (Map.domain store)) with | Just x -> x | Nothing -> Page_id 0 end);
+      |>
 
     val key_eq : forall 'p 'e 'k.
       env 'p 'e 'k ->
@@ -243,6 +251,26 @@ module Fs_impl_types = struct
     type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
 end
 
+
+(* fs_impl_types unit tests *)
+(* key_eq *)
+assert key_eq_test1: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 1) = true
+assert key_eq_test2: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = false
+(* key_lte *)
+assert key_lt_test1: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = true
+assert key_lt_test2: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 2) (Fs_impl_types.Key 2) = true
+assert key_lt_test3: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 3) (Fs_impl_types.Key 2) = false
+(* entry_lt *)
+assert entry_lt_test1: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lt_test2: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = false
+assert entry_lt_test3: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 1) = false
+(* entry_eq *)
+assert entry_eq_test1: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = true
+assert entry_eq_test2: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = false
+(* entry_lte *)
+assert entry_lte_test1: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lte_test2: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
+assert entry_lte_test3: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
 module BTree = struct
     open Fs_impl_types
     open Utility
@@ -570,3 +598,27 @@ module BTree = struct
       | c -> find_loop env c
       end)
 end
+
+(* sorted_entry_list *)
+assert sorted_entry_list_test1: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
+assert sorted_entry_list_test2: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = false
+(* union_list_of_entry_set *)
+assert union_list_of_entry_set_test: BTree.union_list_of_entry_set [{(Fs_impl_types.Entry (1:nat))};{(Fs_impl_types.Entry 2)}] = Set.insert (Fs_impl_types.Entry 1) {(Fs_impl_types.Entry 2)}
+(* entry_set *)
+assert entry_set_test1: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Set.insert (Fs_impl_types.Entry 0) {(Fs_impl_types.Entry 2)}
+assert entry_set_test2: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = (Set.fromList [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)])
+assert entry_set_test3: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = {}
+assert entry_set_test4: BTree.entry_set ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = {}
+(* get_m *)
+assert get_m_test1: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Nothing
+assert get_m_test2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
+assert get_m_test3: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
+assert get_m_test4: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
