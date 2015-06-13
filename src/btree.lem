@@ -42,8 +42,6 @@ module Utility = struct
         else []
     )
 
-    assert from_to1: from_to (10:nat) (2:nat) = []
-
     (* find the first index of [l] satisfying a predicate [p] *)
     val first_helper : forall 'a.
        list 'a ->
@@ -130,11 +128,34 @@ module Utility = struct
 
 end
 
-                   (* utility unit tests *)
+(* utility unit tests *)
 
-                   (* sort *)
-                   assert sort_test: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
-
+(* sort *)
+assert sort_test: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+(* nth_from_1 *)
+assert nth_from_1_test: Utility.nth_from_1 [(1:nat);2;3;4] 3 = (3:nat)
+(* from_to *)
+assert from_to_test1:  Utility.from_to (10:nat) (2:nat) = []
+assert from_to_test2:  Utility.from_to (1:nat) (3:nat) = [1;2;3]
+(* first *)
+assert first_test1: Utility.first [(1:nat);2;3;4] (fun x -> x = 2) = 2
+assert first_test2: Utility.first [(1:nat);2;3;4] (fun x -> x = 5) = (List.length [(1:nat);2;3;4])+1
+(* test *)
+assert test_test1: Utility.test 2 [(1:nat);2;3;4] (fun x -> x = 2) = true
+assert test_test2: Utility.test 3 [(1:nat);2;3;4] (fun x -> x = 2) = false
+assert test_test3: Utility.test 100 [(1:nat);2;3;4] (fun _ -> true) = false
+(* replace *)
+assert replace_test: Utility.replace (3,3,[(1:nat);2;9;4]) = [(1:nat);2;3;4]
+(* ins *)
+assert ins_test1: Utility.ins (5,5,[(1:nat);2;3;4]) = [(1:nat);2;3;4;5]
+assert ins_test2: Utility.ins (5,3,[(1:nat);2;3;4]) = [(1:nat);2;5;3;4]
+assert ins_test3: Utility.ins (5,1,[(1:nat);2;3;4]) = [(5:nat);1;2;3;4]
+(* take2 *)
+assert take2_test1: Utility.take2 [(1:nat);2;3;4] 2 = ([(1:nat);2],[3;4])
+assert take2_test2: Utility.take2 [(1:nat);2;3;4] 1 = ([(1:nat)],[2;3;4])
+assert take2_test3: Utility.take2 [(1:nat);2;3;4] 0 = ([],[(1:nat);2;3;4])
+assert take2_test4: Utility.take2 [(1:nat);2;3;4] 4 = ([(1:nat);2;3;4],[])
+assert take2_test5: Utility.take2 ([]:(list nat)) 4 = ([],[])
 
 module Fs_impl_types = struct
     open Utility
