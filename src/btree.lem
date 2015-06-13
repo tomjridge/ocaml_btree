@@ -131,32 +131,32 @@ end
 (* utility unit tests *)
 
 (* sort *)
-assert sort_test1: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
-assert sort_test2: Utility.sort (>) [1;2;3;4] = [(4:nat);3;2;1]
+assert sort_should_sort_in_increasing_order: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+assert sort_should_sort_in_decreasing_order: Utility.sort (>) [1;2;3;4] = [(4:nat);3;2;1]
 (* nth_from_1 *)
-assert nth_from_1_test: Utility.nth_from_1 [(1:nat);2;3;4] 3 = (3:nat)
+assert nth_from_1_should_return_the_right_index: Utility.nth_from_1 [(1:nat);2;3;4] 3 = (3:nat)
 (* from_to *)
-assert from_to_test1:  Utility.from_to (10:nat) (2:nat) = []
-assert from_to_test2:  Utility.from_to (1:nat) (3:nat) = [1;2;3]
+assert from_to_should_return_an_empty_list_for_a_wrong_range:  Utility.from_to (10:nat) (2:nat) = []
+assert from_to_should_return_1_2_3_list_from_1_to_3:  Utility.from_to (1:nat) (3:nat) = [1;2;3]
 (* first *)
-assert first_test1: Utility.first [(1:nat);2;3;4] (fun x -> x = 2) = 2
-assert first_test2: Utility.first [(1:nat);2;3;4] (fun x -> x = 5) = (List.length [(1:nat);2;3;4])+1
+assert first_should_return_the_element_equal_to_2_in_1_2_3_4_list: Utility.first [(1:nat);2;3;4] (fun x -> x = 2) = 2
+assert first_should_return_length_plus_one_if_the_condition_is_unsatisfied: Utility.first [(1:nat);2;3;4] (fun x -> x = 5) = (List.length [(1:nat);2;3;4])+1
 (* test *)
-assert test_test1: Utility.test 2 [(1:nat);2;3;4] (fun x -> x = 2) = true
-assert test_test2: Utility.test 3 [(1:nat);2;3;4] (fun x -> x = 2) = false
-assert test_test3: Utility.test 100 [(1:nat);2;3;4] (fun _ -> true) = false
+assert test_should_check_the_2nd_element_of_1_2_3_4_list_is_equal_to_2: Utility.test 2 [(1:nat);2;3;4] (fun x -> x = 2) = true
+assert test_should_check_the_3rd_element_of_1_2_3_4_list_is_not_equal_to_2: Utility.test 3 [(1:nat);2;3;4] (fun x -> x = 2) = false
+assert test_should_be_false_if_the_index_is_bigger_than_the_list_length: Utility.test 100 [(1:nat);2;3;4] (fun _ -> true) = false
 (* replace *)
-assert replace_test: Utility.replace (3,3,[(1:nat);2;9;4]) = [(1:nat);2;3;4]
+assert replace_should_replace_a_middle_element: Utility.replace (3,3,[(1:nat);2;9;4]) = [(1:nat);2;3;4]
 (* ins *)
-assert ins_test1: Utility.ins (5,5,[(1:nat);2;3;4]) = [(1:nat);2;3;4;5]
-assert ins_test2: Utility.ins (5,3,[(1:nat);2;3;4]) = [(1:nat);2;5;3;4]
-assert ins_test3: Utility.ins (5,1,[(1:nat);2;3;4]) = [(5:nat);1;2;3;4]
+assert ins_should_insert_in_tail: Utility.ins (5,5,[(1:nat);2;3;4]) = [(1:nat);2;3;4;5]
+assert ins_should_insert_in_middle: Utility.ins (5,3,[(1:nat);2;3;4]) = [(1:nat);2;5;3;4]
+assert ins_should_append: Utility.ins (5,1,[(1:nat);2;3;4]) = [(5:nat);1;2;3;4]
 (* take2 *)
-assert take2_test1: Utility.take2 [(1:nat);2;3;4] 2 = ([(1:nat);2],[3;4])
-assert take2_test2: Utility.take2 [(1:nat);2;3;4] 1 = ([(1:nat)],[2;3;4])
-assert take2_test3: Utility.take2 [(1:nat);2;3;4] 0 = ([],[(1:nat);2;3;4])
-assert take2_test4: Utility.take2 [(1:nat);2;3;4] 4 = ([(1:nat);2;3;4],[])
-assert take2_test5: Utility.take2 ([]:(list nat)) 4 = ([],[])
+assert take2_should_split_list_in_half: Utility.take2 [(1:nat);2;3;4] 2 = ([(1:nat);2],[3;4])
+assert take2_should_split_1_3: Utility.take2 [(1:nat);2;3;4] 1 = ([(1:nat)],[2;3;4])
+assert take2_should_split_0_4: Utility.take2 [(1:nat);2;3;4] 0 = ([],[(1:nat);2;3;4])
+assert take2_should_split_4_0: Utility.take2 [(1:nat);2;3;4] 4 = ([(1:nat);2;3;4],[])
+assert take2_should_split_empty_list: Utility.take2 ([]:(list nat)) 4 = ([],[])
 
 module Fs_impl_types = struct
     open Utility
@@ -258,23 +258,23 @@ end
 
 (* fs_impl_types unit tests *)
 (* key_eq *)
-assert key_eq_test1: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 1) = true
-assert key_eq_test2: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = false
+assert key_eq_should_be_true_on_equal_entries: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 1) = true
+assert key_eq_should_be_false_on_different_entries: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = false
 (* key_lte *)
-assert key_lt_test1: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = true
-assert key_lt_test2: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 2) (Fs_impl_types.Key 2) = true
-assert key_lt_test3: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 3) (Fs_impl_types.Key 2) = false
+assert key_lte_should_be_true_if_first_smaller: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = true
+assert key_lte_should_be_true_if_equal: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 2) (Fs_impl_types.Key 2) = true
+assert key_lte_should_be_false_if_first_greater: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 3) (Fs_impl_types.Key 2) = false
 (* entry_lt *)
-assert entry_lt_test1: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
-assert entry_lt_test2: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = false
-assert entry_lt_test3: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 1) = false
+assert entry_lt_should_be_true_if_first_smaller: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lt_should_be_false_if_equal: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = false
+assert entry_lt_should_be_false_if_first_bigger: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 1) = false
 (* entry_eq *)
-assert entry_eq_test1: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = true
-assert entry_eq_test2: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = false
+assert entry_eq_should_be_true_if_equal: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = true
+assert entry_eq_should_be_false_if_different: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = false
 (* entry_lte *)
-assert entry_lte_test1: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
-assert entry_lte_test2: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
-assert entry_lte_test3: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
+assert entry_lte_should_be_true_if_first_smaller: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lte_should_be_true_if_equal: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
+assert entry_lte_should_be_false_if_first_greater: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
 
 module BTree = struct
     open Fs_impl_types
@@ -607,25 +607,32 @@ module BTree = struct
 end
 
 (* sorted_entry_list *)
-assert sorted_entry_list_test1: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
-assert sorted_entry_list_test2: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = true
+assert sorted_entry_should_be_true_if_list_in_increasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
+assert sorted_entry_should_be_true_if_empty_list: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = true
+assert sorted_entry_should_be_false_if_list_in_decreasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 3); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 1)] = false
 (* union_list_of_entry_set *)
-assert union_list_of_entry_set_test: BTree.union_list_of_entry_set [{(Fs_impl_types.Entry (1:nat))};{(Fs_impl_types.Entry 2)}] = Set.insert (Fs_impl_types.Entry 1) {(Fs_impl_types.Entry 2)}
+assert union_list_of_entry_set_should_flatten_list_of_sets_to_set: BTree.union_list_of_entry_set [{(Fs_impl_types.Entry (1:nat))};{(Fs_impl_types.Entry 2)}] = Set.insert (Fs_impl_types.Entry 1) {(Fs_impl_types.Entry 2)}
 (* entry_set *)
-assert entry_set_test1: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Set.insert (Fs_impl_types.Entry 0) {(Fs_impl_types.Entry 2)}
-assert entry_set_test2: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = (Set.fromList [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)])
-assert entry_set_test3: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = {}
-assert entry_set_test4: BTree.entry_set ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = {}
+assert entry_set_should_get_0_2_entries_from_leaf_with_0_2: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Set.insert (Fs_impl_types.Entry 0) {(Fs_impl_types.Entry 2)}
+assert entry_set_should_get_0_2_3_5_entries_from_inode_pointing_to_leaves: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = (Set.fromList [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)])
+assert entry_set_should_return_empty_when_id_not_in_store: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = {}
+assert entry_set_should_return_empty_when_empty_store: BTree.entry_set ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = {}
 (* get_m *)
-assert get_m_test1: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Nothing
-assert get_m_test2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
-assert get_m_test3: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
-assert get_m_test4: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
+assert get_m_should_return_nothing_when_empty_store: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Nothing
+assert get_m_should_return_nothing_when_id_not_in_store: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
+assert get_m_should_return_2_when_id_points_to_leaf_0_2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
+assert get_m_should_return_2_when_id_points_to_inode_pointing_to_2_leaves: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
 (* wf_btree *)
-assert wf_btree_test1: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 1 = true
-assert wf_btree_test2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},1) 1 = false
-assert wf_btree_test3: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 0 = false
-assert wf_btree_test4: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 2 = false
+assert wf_btree_should_be_true_on_store_equal_to_empty_btree: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 1 = true
+assert wf_btree_should_be_false_when_first_node_lenght_is_wrong: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},1) 1 = false
+assert wf_btree_should_be_false_when_height_is_0: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 0 = false
+assert wf_btree_should_be_false_when_btree_is_empty_and_given_height_is_2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 2 = false
+assert wf_btree_should_be_false_when_the_root_id_does_not_exist: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 1),{},0) 1 = false
+assert wf_btree_should_be_false_when_entry_set_has_an_entry_but_the_store_is_empty: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{Fs_impl_types.Entry 0},0) 1 = false
+assert wf_btree_should_be_false_when_empty_btree_has_an_inode: BTree.wf_btree Fs_impl_types.nat_env (Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.INode(Fs_impl_types.I([],[])))])) ((Fs_impl_types.Page_id 0),{},0) 1 = false
+assert wf_btree_should_be_false_when_root_id_is_not_in_store_and_given_heigh_is_2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 1),{},0) 2 = false
+(* sorted_entry_list *)
+(* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
