@@ -177,6 +177,9 @@ module Fs_impl_types = struct
     (* a store represents the actual content of the disk *)
     type store 'p 'e 'k = map (page_id 'p) (node 'p 'e 'k)
 
+    val nat_empty_btree_store : store nat nat nat
+    let nat_empty_btree_store = Map.fromList [(Page_id 0,LNode(L[]))]
+
     type env 'p 'e 'k =
       <|
         (* fanout of the btree *)
@@ -272,6 +275,7 @@ assert entry_eq_test2: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_typ
 assert entry_lte_test1: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
 assert entry_lte_test2: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
 assert entry_lte_test3: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
+
 module BTree = struct
     open Fs_impl_types
     open Utility
@@ -281,16 +285,18 @@ module BTree = struct
       list (entry 'e) ->
       bool
     let sorted_entry_list env es =
-      let f1 i =
-        let sorted_es = sort (entry_lt env) es in
-        let s_e = index sorted_es i in
-        let e = index es i in
-        (match (s_e,e) with
-        | (Just s_e, Just e) -> entry_eq env s_e e
-        | _ -> false
-         end)
-      in
-      (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
+      if List.length es = 0 then true
+      else
+        let f1 i =
+          let sorted_es = sort (entry_lt env) es in
+          let s_e = index sorted_es i in
+          let e = index es i in
+          (match (s_e,e) with
+           | (Just s_e, Just e) -> entry_eq env s_e e
+           | _ -> false
+           end)
+        in
+        (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
 
     val union_list_of_entry_set : forall 'e.
       list (set (entry 'e)) ->
@@ -353,7 +359,7 @@ module BTree = struct
             | INode _ -> false
             | LNode (L(es)) -> (
               let n = List.length es in
-              match (n = 0) && (n <= env.fanout) with
+              match (n = n0) && (n <= env.fanout) with
               | false -> false
               | true -> (
                 (* construct a set of entries from es *)
@@ -602,7 +608,7 @@ end
 
 (* sorted_entry_list *)
 assert sorted_entry_list_test1: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
-assert sorted_entry_list_test2: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = false
+assert sorted_entry_list_test2: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = true
 (* union_list_of_entry_set *)
 assert union_list_of_entry_set_test: BTree.union_list_of_entry_set [{(Fs_impl_types.Entry (1:nat))};{(Fs_impl_types.Entry 2)}] = Set.insert (Fs_impl_types.Entry 1) {(Fs_impl_types.Entry 2)}
 (* entry_set *)
@@ -616,10 +622,10 @@ assert get_m_test2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_imp
 assert get_m_test3: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
 assert get_m_test4: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
 (* wf_btree *)
-(* sorted_entry_list *)
-(* sorted_entry_list *)
-(* sorted_entry_list *)
-(* sorted_entry_list *)
+assert wf_btree_test1: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 1 = true
+assert wf_btree_test2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},1) 1 = false
+assert wf_btree_test3: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 0 = false
+assert wf_btree_test4: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 2 = false
 (* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
