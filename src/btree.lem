@@ -42,6 +42,8 @@ module Utility = struct
         else []
     )
 
+    assert from_to1: from_to (10:nat) (2:nat) = []
+
     (* find the first index of [l] satisfying a predicate [p] *)
     val first_helper : forall 'a.
        list 'a ->
@@ -127,6 +129,12 @@ module Utility = struct
       end)
 
 end
+
+                   (* utility unit tests *)
+
+                   (* sort *)
+                   assert sort_test: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+
 
 module Fs_impl_types = struct
     open Utility
