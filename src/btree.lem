@@ -1,4 +1,4 @@
-open import Pervasives Assert_extra
+open import Pervasives Set_extra Assert_extra
 
 module Utility = struct
 
@@ -131,7 +131,8 @@ end
 (* utility unit tests *)
 
 (* sort *)
-assert sort_test: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+assert sort_test1: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+assert sort_test2: Utility.sort (>) [1;2;3;4] = [(4:nat);3;2;1]
 (* nth_from_1 *)
 assert nth_from_1_test: Utility.nth_from_1 [(1:nat);2;3;4] 3 = (3:nat)
 (* from_to *)
@@ -194,7 +195,7 @@ module Fs_impl_types = struct
         fanout = 4;
         entry_to_key = (fun (Entry e) -> Key e);
         key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
-        free_page_id = (fun store -> match (Set.findMax (Map.domain store)) with | Just x -> x | Nothing -> Page_id 0 end);
+        free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | h::_ -> h | [] -> (Page_id 0) end);
       |>
 
     val key_eq : forall 'p 'e 'k.
@@ -614,7 +615,7 @@ assert get_m_test1: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat n
 assert get_m_test2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
 assert get_m_test3: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
 assert get_m_test4: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
-(* sorted_entry_list *)
+(* wf_btree *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
