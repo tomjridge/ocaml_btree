@@ -198,7 +198,7 @@ module Fs_impl_types = struct
         fanout = 4;
         entry_to_key = (fun (Entry e) -> Key e);
         key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
-        free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | h::_ -> h | [] -> (Page_id 0) end);
+        free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
       |>
 
     val key_eq : forall 'p 'e 'k.
@@ -631,6 +631,16 @@ assert wf_btree_should_be_false_when_the_root_id_does_not_exist: BTree.wf_btree 
 assert wf_btree_should_be_false_when_entry_set_has_an_entry_but_the_store_is_empty: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{Fs_impl_types.Entry 0},0) 1 = false
 assert wf_btree_should_be_false_when_empty_btree_has_an_inode: BTree.wf_btree Fs_impl_types.nat_env (Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.INode(Fs_impl_types.I([],[])))])) ((Fs_impl_types.Page_id 0),{},0) 1 = false
 assert wf_btree_should_be_false_when_root_id_is_not_in_store_and_given_heigh_is_2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 1),{},0) 2 = false
+(* FIXME check all the possible false clause of wf_btree later *)
+(* inserts_in_tree *)
+assert inserts_in_tree_should_insert_an_entry_in_root: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 0] = (Fs_impl_types.Page_id 0,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0])))])):Fs_impl_types.store nat nat nat))
+assert inserts_in_tree_should_have_an_inode_and_two_leaves: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5] = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
+assert wf_btree_THIS_FAILS_WITH_STACK_OVERFLOW: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]),2) 2) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) = true
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
+(* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)

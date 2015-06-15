@@ -1,0 +1,25 @@
+(*
+
+This lines are to record instructions for interactive use.
+
+Interactive before anything else:
+
+    #use "topfind";;
+    #require "num";;
+    #require "zarith";;
+    #directory "../../src_ext/lem/ocaml-lib/";;
+    #load "extract.cma";;
+    #directory "gen_ocaml/";;
+    #load "btree.cma";;
+ *)
+
+
+open Btree
+open Utility
+open Fs_impl_types
+open BTree
+
+let bindings store = Pmap.fold (fun k d a -> (k,d)::a ) store []
+
+let (r,s) = (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id( 0),Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry( 1);Fs_impl_types.Entry( 2);Fs_impl_types.Entry( 3);Fs_impl_types.Entry( 4);Fs_impl_types.Entry( 5)])
+let _ = bindings s

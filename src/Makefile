@@ -10,7 +10,7 @@ BTREE_FILE:=btree.lem
 ISA_GEN_DIR:=isabelle/gen_isabelle
 OC_GEN_DIR:=ocaml/gen_ocaml
 COVERAGE_DIR=ocaml/result_$(shell date -I)
-BISECT_FILE:=$(shell find $(COVERAGE_DIR) -name bisect*.out)
+BISECT_FILE=$(shell find $(COVERAGE_DIR) -name bisect*.out)
 
 all: build_lem generate_isa_btree generate_ocaml_btree build_ocaml
 

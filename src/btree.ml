@@ -420,7 +420,7 @@ let get_set_entries sg =
         []
         (Store_map.bindings sg))
 
-let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4]
+let (root,store_with_full_root) = inserts_in_tree (root0,empty_store0) [1;2;3;4;5]
 let _ = Store_map.bindings store_with_full_root
 
 let _ = wf_btree store_with_full_root (root,(get_set_entries store_with_full_root),4) 1
