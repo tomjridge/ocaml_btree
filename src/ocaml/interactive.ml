@@ -10,7 +10,7 @@ Interactive before anything else:
     #directory "../../src_ext/lem/ocaml-lib/";;
     #load "extract.cma";;
     #directory "gen_ocaml/";;
-    #load "btree.cma";;
+    #mod_use "btree.ml";;
  *)
 
 
@@ -23,3 +23,6 @@ let bindings store = Pmap.fold (fun k d a -> (k,d)::a ) store []
 
 let (r,s) = (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id( 0),Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry( 1);Fs_impl_types.Entry( 2);Fs_impl_types.Entry( 3);Fs_impl_types.Entry( 4);Fs_impl_types.Entry( 5)])
 let _ = bindings s
+
+let (r',s') = (BTree.inserts_in_tree Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry( 6);Fs_impl_types.Entry( 7);Fs_impl_types.Entry( 8);Fs_impl_types.Entry( 9);Fs_impl_types.Entry( 10);Fs_impl_types.Entry( 11)])
+let _ = bindings s'

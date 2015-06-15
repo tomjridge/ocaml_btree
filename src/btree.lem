@@ -635,11 +635,47 @@ assert wf_btree_should_be_false_when_root_id_is_not_in_store_and_given_heigh_is_
 (* inserts_in_tree *)
 assert inserts_in_tree_should_insert_an_entry_in_root: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 0] = (Fs_impl_types.Page_id 0,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0])))])):Fs_impl_types.store nat nat nat))
 assert inserts_in_tree_should_have_an_inode_and_two_leaves: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5] = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
-assert wf_btree_THIS_FAILS_WITH_STACK_OVERFLOW: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]),2) 2) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) = true
-(* sorted_entry_list *)
-(* sorted_entry_list *)
-(* sorted_entry_list *)
-(* sorted_entry_list *)
+assert inserts_in_tree_should_not_alter_the_tree_if_entries_are_already_in: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5] = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
+assert inserts_in_tree_should_create_three_inodes_tree: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11] = (Fs_impl_types.Page_id 7,(Map.fromList([(Fs_impl_types.Page_id 7,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 7],
+      [Fs_impl_types.Page_id 2; Fs_impl_types.Page_id 6])));
+ (Fs_impl_types.Page_id 6,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 9],
+      [Fs_impl_types.Page_id 4; Fs_impl_types.Page_id 5])));
+ (Fs_impl_types.Page_id 5,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 9; Fs_impl_types.Entry 10;
+      Fs_impl_types.Entry 11]));
+ (Fs_impl_types.Page_id 4,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 7; Fs_impl_types.Entry 8]));
+ (Fs_impl_types.Page_id 3,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 5; Fs_impl_types.Entry 6]));
+ (Fs_impl_types.Page_id 2,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 3; Fs_impl_types.Key 5],
+      [Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1;
+       Fs_impl_types.Page_id 3])));
+ (Fs_impl_types.Page_id 1,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 3; Fs_impl_types.Entry 4]));
+ (Fs_impl_types.Page_id 0,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))]):Fs_impl_types.store nat nat nat))
+assert wf_btree_after_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]),2) 2) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) = true
+assert wf_btree_should_be_true_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),2) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = true
+assert wf_btree_should_be_false_with_a_wrong_n_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),3) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = false
 (* sorted_entry_list *)
 (* sorted_entry_list *)
 (* sorted_entry_list *)
