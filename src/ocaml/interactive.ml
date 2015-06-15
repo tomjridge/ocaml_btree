@@ -26,3 +26,5 @@ let _ = bindings s
 
 let (r',s') = (BTree.inserts_in_tree Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry( 6);Fs_impl_types.Entry( 7);Fs_impl_types.Entry( 8);Fs_impl_types.Entry( 9);Fs_impl_types.Entry( 10);Fs_impl_types.Entry( 11)])
 let _ = bindings s'
+
+let _ = BTree.find_loop Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 1), r',s')
