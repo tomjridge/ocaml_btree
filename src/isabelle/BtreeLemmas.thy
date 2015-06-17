@@ -36,7 +36,7 @@ apply (case_tac "a")
       apply auto
 done
 
-lemma find_find_trans [simp]:
+lemma find_trans_of_find_trans_does_not_alter_store [simp]:
 "(find_trans e (find_trans e (a,q,s))) = (b',q',s') \<Longrightarrow> s = s'"
 apply (case_tac "a")
 apply auto
@@ -58,19 +58,29 @@ apply (simp add:find_trans.simps)
 done
 
 lemma find_h_does_not_alter_store:
-"(find_h e ((Find k),r,s) h) = (a,b,s') \<Longrightarrow> s = s'"
+"(find_h e (a,r,s) h) = (a',b,s') \<Longrightarrow> s = s'"
+apply (induct h)
 apply auto
-
+  (* h = 0 *)
+  apply (case_tac "a")
+  apply auto
+  apply (case_tac " s aa")
+  apply auto
+  apply (case_tac " aaa")
+  apply auto
+  apply (case_tac "lnode")
+  apply auto
+  (* h = Suc h *)
+oops
+   
 lemma find_does_not_alter_wfbtree: 
-"(wf_btree e s (r,ss,n) h) \<longrightarrow> (((find_h e ((Find k),r,s) h) = (i,q,s)))"
+"(wf_btree e s (r,ss,n) h) \<Longrightarrow> (((find_h e ((Find k),r,s) h) = (i,q,s)) (*\<and> (if i = None then True else (the i \<in> ss \<and>  (key_lt e) k ((entry_to_key e) (the i))))*) )"
 apply auto
 apply (induction "h")
-apply (case_tac "Find k")
-apply auto
-apply (case_tac "h")
-apply (case_tac "find_trans e (Find k, r, s)")
-apply auto
-apply (case_tac "a")
-apply auto
+  (* h = 0 *)
+  apply auto
 
+  (* h = Suc h *)
+  (* h again? Tried to use case_tac, but does not seem a good idea: cascade of cases *)
+oops
 end
