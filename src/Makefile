@@ -1,7 +1,7 @@
 SHELL:=bash
 
+#LEMFLAGS:=-only_changed_output -wl_unused_vars ign -wl_rename err
 LEM:=$(shell command -v ../src_ext/lem/lem || command -v lem)
-LEMFLAGS:=-only_changed_output -wl_unused_vars ign -wl_rename err
 EXTRACTDIR:=$(shell dirname $(LEM))/ocaml-lib/
 CAMLCINCLUDES:=-I $(EXTRACTDIR) extract.cma
 CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -linkpkg -package zarith
@@ -18,9 +18,7 @@ build_lem: $(BTREE_FILE)
 	$(LEM) $(BTREE_FILE)
 
 generate_isa_btree: build_lem
-	mkdir -p $(ISA_GEN_DIR)
-	$(LEM) -isa -add_full_isa_lib_path -outdir $(ISA_GEN_DIR) $(BTREE_FILE)
-	chmod ugo-w $(ISA_GEN_DIR)/*
+	make -C isabelle
 
 generate_ocaml_btree: build_lem
 	mkdir -p $(OC_GEN_DIR)

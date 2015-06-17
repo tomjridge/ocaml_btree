@@ -578,31 +578,36 @@ module BTree = struct
        env 'p 'e 'k ->
        find_config 'p 'e 'k ->
        find_config 'p 'e 'k
-    let find_trans env (Find(k),r,sg) = (
-      match Map.lookup r sg with
-      | Just (INode(I(ds,ps))) ->
-         let i = first ds (fun x -> env.key_lt k x) in
-         let p = nth_from_1 ps i in
-         (Find k,p,sg)
-      | Just (LNode(L(es))) ->
-         let i = first es (fun x -> key_lte env k (env.entry_to_key x)) in
-         (F_Ret(r,i),r,sg)
-      | Nothing -> failwith "find: invalid root"
-      end)
+    let find_trans env c0 = (
+      match c0 with
+      | (Find k,r,sg) -> (
+        match Map.lookup r sg with
+        | Just (INode(I(ds,ps))) ->
+           let i = first ds (fun x -> env.key_lt k x) in
+           let p = nth_from_1 ps i in
+           (Find k,p,sg)
+        | Just (LNode(L(es))) ->
+           let i = first es (fun x -> key_lte env k (env.entry_to_key x)) in
+           (F_Ret(r,i),r,sg)
+        | Nothing -> (Find k,r,sg) (* failwith "find: invalid root" *)
+        end)
+      | ret -> ret end)
 
-    val find_loop : forall 'p 'e 'k.
+    val find_h : forall 'p 'e 'k.
        env 'p 'e 'k ->
        find_config 'p 'e 'k ->
-       maybe (entry 'e)
-    let rec find_loop env c0 = (
-      match find_trans env c0 with
-      | (F_Ret(r,i),_,sg) -> (
+       nat ->
+       (maybe (entry 'e) * page_id 'p * store 'p 'e 'k)
+    let rec find_h env c0 h = (
+      match (h,c0) with
+      | (_,(F_Ret (r,i),_,sg)) -> (
         match Map.lookup r sg with
-        | Nothing -> Nothing
-        | Just (LNode(L(qs))) -> List.index qs i
-        | _ -> failwith "impossible: inode should not be returned"
+        | Nothing -> (Nothing,r,sg)
+        | Just (LNode(L(qs))) -> ((List.index qs i),r,sg)
+        | _ -> (Nothing,r,sg) (*failwith "impossible: inode should not be returned"*)
         end)
-      | c -> find_loop env c
+      | (0,(_,r,sg)) -> (Nothing,r,sg)
+      | _ -> find_h env (find_trans env c0) (h-1)
       end)
 end
 
@@ -675,6 +680,45 @@ assert wf_btree_should_be_false_when_root_id_is_not_in_store_and_given_heigh_is_
 assert wf_btree_after_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]),2) 2) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) = true
 assert wf_btree_should_be_true_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),2) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = true
 assert wf_btree_should_be_false_with_a_wrong_n_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),3) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = false
+
+(* example of lemma *)
+lemma wf_btree_false_empty_tree: (forall e s c. BTree.wf_btree e s c 0 = false)
 (* find *)
-assert find_loop_should_find_nothing_in_a_store_containing_an_empty_root: BTree.find_loop Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) = Nothing
-assert find_loop_should_find_entry_11_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_loop Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s)) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = Just(Fs_impl_types.Entry 11)
+assert find_h_should_find_nothing_in_a_store_containing_an_empty_root: BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = (Nothing,(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store)
+assert find_h_should_find_entry_11_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 11),Fs_impl_types.Page_id 5,(Map.fromList([(Fs_impl_types.Page_id 7,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 7],
+      [Fs_impl_types.Page_id 2; Fs_impl_types.Page_id 6])));
+ (Fs_impl_types.Page_id 6,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 9],
+      [Fs_impl_types.Page_id 4; Fs_impl_types.Page_id 5])));
+ (Fs_impl_types.Page_id 5,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 9; Fs_impl_types.Entry 10;
+      Fs_impl_types.Entry 11]));
+ (Fs_impl_types.Page_id 4,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 7; Fs_impl_types.Entry 8]));
+ (Fs_impl_types.Page_id 3,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 5; Fs_impl_types.Entry 6]));
+ (Fs_impl_types.Page_id 2,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 3; Fs_impl_types.Key 5],
+      [Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1;
+       Fs_impl_types.Page_id 3])));
+ (Fs_impl_types.Page_id 1,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 3; Fs_impl_types.Entry 4]));
+ (Fs_impl_types.Page_id 0,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))])))
