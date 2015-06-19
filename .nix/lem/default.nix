@@ -6,27 +6,30 @@ let
     ocaml = pkgs.ocaml_4_02_1;
     git = pkgs.git;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
+    java = pkgs.jre; # from isabelle 
 in stdenv.mkDerivation {
     name = "lem";
   
     src = fetchgit {
       url = https://bitbucket.org/Peter_Sewell/lem.git;
-      rev = "d3326d5"; # a commit which builds on 2015-06-12
-      sha256 = "3dbec35806b5e4d81a9f00f3876bc230d70cea8c8cda7d85e91b296e148d8d26";
+      rev = "2739f6a"; # good according to andrea
+      sha256 = "9f3669122d45f2afdc1bc0bb46cb7b168f4f139a4d3f5a9511f1df82e8e6d788";
     };
   
-    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl pkgs.ocamlPackages_4_02_1.zarith pkgs.gmp]; # note that lem tries to build zarith as well
+    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl pkgs.ocamlPackages_4_02_1.zarith pkgs.gmp pkgs.isabelle ]; # note that lem tries to build zarith as well; java
   
     configurePhase = "true"; 	# Skip configure
     
     buildPhase = ''
+      export ISABELLE_JDK_HOME=${java}
       export LD_LIBRARY_PATH=`pwd`/ocaml-lib/dependencies/zarith:$LD_LIBRARY_PATH  # complete hack - need to find dllzarith.so
-      echo 'let v="d3326d5"' >src/version.ml  # complete hack - the source code isn't a git repo after fetchgit
+      echo 'let v="2739f6a"' >src/version.ml  # complete hack - the source code isn't a git repo after fetchgit
       echo "!!!"
       make
 
       echo "!!!"
       make ocaml-libs
+      # make isa-libs
       '';
   
     installPhase = "mkdir -p $out/lem && cp -R -L * $out/lem"; # so we can inspect the result
