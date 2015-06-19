@@ -7,6 +7,7 @@ let
     git = pkgs.git;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
     java = pkgs.jre; # from isabelle 
+    isabelle = import ./../isabelle { };
 in stdenv.mkDerivation {
     name = "lem";
   
@@ -16,7 +17,7 @@ in stdenv.mkDerivation {
       sha256 = "9f3669122d45f2afdc1bc0bb46cb7b168f4f139a4d3f5a9511f1df82e8e6d788";
     };
   
-    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl pkgs.ocamlPackages_4_02_1.zarith pkgs.gmp pkgs.isabelle ]; # note that lem tries to build zarith as well; java
+    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl pkgs.ocamlPackages_4_02_1.zarith pkgs.gmp isabelle ]; # note that lem tries to build zarith as well; java
   
     configurePhase = "true"; 	# Skip configure
     
@@ -29,10 +30,21 @@ in stdenv.mkDerivation {
 
       echo "!!!"
       make ocaml-libs
+
+      mkdir -p $out/lem/.isabelle  # after build, need to copy these images to local .isabelle
+      export USER_HOME=$out/lem
       # make isa-libs
+      # isabelle build -d isabelle-lib -b LEM # do this in the lem source dir
+
+      # sudo chmod u+w ~/.isabelle/Isabelle2014/heaps/polyml-5.5.2_x86-linux/*
+      # cp .isabelle/Isabelle2014/heaps/polyml-5.5.2_x86-linux/* ~/.isabelle/Isabelle2014/heaps/polyml-5.5.2_x86-linux/
       '';
   
-    installPhase = "mkdir -p $out/lem && cp -R -L * $out/lem"; # so we can inspect the result
+    installPhase = ''
+mkdir -p $out/lem && cp -R -L * $out/lem
+mkdir $out/bin
+ln -s $out/lem/lem $out/bin/lem 
+''; # so we can inspect the result
     # note that we need to export LEM_LIBRARY_PATH=<absolute path to lem directory>/library before invoking lem
 
     createFindlibDestdir = true;
