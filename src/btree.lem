@@ -253,6 +253,11 @@ module Fs_impl_types = struct
     (* find types *)
     type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
     type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
+
+    val dest_find_config_store : forall 'p 'e 'k.
+      find_config 'p 'e 'k ->
+      store 'p 'e 'k
+    let dest_find_config_store (_,_,s) = s
 end
 
 
