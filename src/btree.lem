@@ -1,4 +1,4 @@
-open import Pervasives Assert_extra
+open import Pervasives Set_extra Assert_extra
 
 module Utility = struct
 
@@ -40,8 +40,124 @@ module Utility = struct
         if i<j
         then i::(from_to (i+1) j)
         else []
-)
+    )
+
+    (* find the first index of [l] satisfying a predicate [p] *)
+    val first_helper : forall 'a.
+       list 'a ->
+       ('a -> bool) ->
+       nat ->
+       nat
+    let rec first_helper xs p i =
+      if i <= List.length xs then
+        if p (nth_from_1 xs i) then i else first_helper xs p (i+1)
+      else
+        (List.length xs) + 1
+
+    val first : forall 'a.
+       list 'a ->
+       ('a -> bool) ->
+       nat
+    let first xs p = (
+      first_helper xs p 1
+    )
+
+    (* it checks that predicate [p] on the [k]th element of [xs] *)
+    val test : forall 'a.
+       nat ->
+       list 'a ->
+       ('a -> bool) ->
+       bool
+    let test k xs p = (
+      if (1 <= k && k <= List.length xs) then
+        p (nth_from_1 xs k)
+      else false
+    )
+
+  (* [replace] updates the value of [xs] at
+                        index [i] with the new value [a] *)
+    val replace : forall 'a.
+       ('a * nat * list 'a ) ->
+       list 'a
+    let rec replace (a,i,es) = (
+      match i with
+      | 0 -> failwith "replace: 0"
+      | 1 -> (
+        match es with
+        | [] -> failwith "replace: es = []"
+        | _::xs -> a::xs
+        end)
+      | _ -> (
+        match es with
+        | [] -> failwith "replace: es = [] 2"
+        | e::es -> e::replace(a,i-1,es)
+        end)
+     end)
+
+    (* [ins] adds a new value [a] at the index [i] of [xs] *)
+    val ins : forall 'a.
+       ('a * nat * list 'a ) ->
+       list 'a
+    let rec ins (a,i,xs) = (
+      match i with
+      | 0 -> failwith "ins: 0"
+      | 1 -> a::xs
+      | _ -> (
+        match xs with
+        | [] -> failwith "ins: []"
+        | x::xs -> x::(ins (a,i-1,xs))
+        end)
+      end)
+
+    (* [take2] divides the list in two sublists at index [n] *)
+    val take2 : forall 'a.
+       list 'a ->
+       nat ->
+       (list 'a * list 'a)
+    let rec take2 xs n = (
+      match n with
+      | 0 -> ([],xs)
+      | _ -> (
+        match xs with
+        | [] -> ([],[])
+        | x::xs -> (
+            let (b,c) = (take2 xs (n-1)) in
+            ((x::b),c))
+        end)
+      end)
+
 end
+
+(* utility unit tests *)
+
+(* sort *)
+assert sort_should_sort_in_increasing_order: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
+assert sort_should_sort_in_decreasing_order: Utility.sort (>) [1;2;3;4] = [(4:nat);3;2;1]
+(* nth_from_1 *)
+assert nth_from_1_should_return_the_right_index: Utility.nth_from_1 [(1:nat);2;3;4] 3 = (3:nat)
+(* from_to *)
+assert from_to_should_return_an_empty_list_for_a_wrong_range:  Utility.from_to (10:nat) (2:nat) = []
+assert from_to_should_return_1_2_3_list_from_1_to_3:  Utility.from_to (1:nat) (3:nat) = [1;2;3]
+(* first *)
+assert first_should_return_the_element_equal_to_2_in_1_2_3_4_list: Utility.first [(1:nat);2;3;4] (fun x -> x = 2) = 2
+assert first_should_return_length_plus_one_if_the_condition_is_unsatisfied: Utility.first [(1:nat);2;3;4] (fun x -> x = 5) = (List.length [(1:nat);2;3;4])+1
+(* test *)
+assert test_should_check_the_2nd_element_of_1_2_3_4_list_is_equal_to_2: Utility.test 2 [(1:nat);2;3;4] (fun x -> x = 2) = true
+assert test_should_check_the_3rd_element_of_1_2_3_4_list_is_not_equal_to_2: Utility.test 3 [(1:nat);2;3;4] (fun x -> x = 2) = false
+assert test_should_be_false_if_the_index_is_bigger_than_the_list_length: Utility.test 100 [(1:nat);2;3;4] (fun _ -> true) = false
+(* replace *)
+assert replace_should_replace_a_middle_element: Utility.replace (3,3,[(1:nat);2;9;4]) = [(1:nat);2;3;4]
+(* ins *)
+assert ins_should_insert_in_tail: Utility.ins (5,5,[(1:nat);2;3;4]) = [(1:nat);2;3;4;5]
+assert ins_should_insert_in_middle: Utility.ins (5,3,[(1:nat);2;3;4]) = [(1:nat);2;5;3;4]
+assert ins_should_append: Utility.ins (5,1,[(1:nat);2;3;4]) = [(5:nat);1;2;3;4]
+(* take2 *)
+assert take2_should_split_list_in_half: Utility.take2 [(1:nat);2;3;4] 2 = ([(1:nat);2],[3;4])
+assert take2_should_split_1_3: Utility.take2 [(1:nat);2;3;4] 1 = ([(1:nat)],[2;3;4])
+assert take2_should_split_0_4: Utility.take2 [(1:nat);2;3;4] 0 = ([],[(1:nat);2;3;4])
+assert take2_should_split_4_0: Utility.take2 [(1:nat);2;3;4] 4 = ([(1:nat);2;3;4],[])
+assert take2_should_split_empty_list: Utility.take2 ([]:(list nat)) 4 = ([],[])
+
 module Fs_impl_types = struct
     open Utility
 
@@ -61,7 +177,10 @@ module Fs_impl_types = struct
     (* a store represents the actual content of the disk *)
     type store 'p 'e 'k = map (page_id 'p) (node 'p 'e 'k)
 
-    type env 'e 'k =
+    val nat_empty_btree_store : store nat nat nat
+    let nat_empty_btree_store = Map.fromList [(Page_id 0,LNode(L[]))]
+
+    type env 'p 'e 'k =
       <|
         (* fanout of the btree *)
         fanout: nat;
@@ -69,11 +188,21 @@ module Fs_impl_types = struct
         entry_to_key: entry 'e -> key 'k;
         (* less than on keys *)
         key_lt : key 'k -> key 'k -> bool;
+        (* get free page_id in store *)
+        free_page_id : store 'p 'e 'k -> page_id 'p
       |>
 
+    val nat_env: env nat nat nat
+    let nat_env =
+      <|
+        fanout = 4;
+        entry_to_key = (fun (Entry e) -> Key e);
+        key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
+        free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
+      |>
 
-    val key_eq : forall 'e 'k.
-      env 'e 'k ->
+    val key_eq : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
@@ -81,24 +210,24 @@ module Fs_impl_types = struct
       not(env.key_lt k1 k2)
       && not(env.key_lt k2 k1)
 
-    val key_lte : forall 'e 'k.
-      env 'e 'k ->
+    val key_lte : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
     let key_lte env k1 k2 =
       env.key_lt k1 k2 || key_eq env k1 k2
 
-    val entry_lt : forall 'e 'k.
-      env 'e 'k ->
+    val entry_lt : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
     let entry_lt env e1 e2 =
       env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)
 
-    val entry_eq : forall 'e 'k.
-      env 'e 'k ->
+    val entry_eq : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
@@ -107,34 +236,67 @@ module Fs_impl_types = struct
       &&
         (not (env.key_lt (env.entry_to_key e2) (env.entry_to_key e1)))
 
-    val entry_lte : forall 'e 'k.
-      env 'e 'k ->
+    val entry_lte : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
     let entry_lte env e1 e2 =
       entry_lt env e1 e2 || entry_eq env e1 e2
+
+
+    (* insertion types *)
+    type ins_comm 'p 'e 'k = Insert of entry 'e | S | D of (key 'k * page_id 'p) | Ret
+
+    type ins_config 'p 'e 'k = ins_comm 'p 'e 'k * page_id 'p * (list (page_id 'p * nat)) * store 'p 'e 'k
+
+    (* find types *)
+    type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
+    type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
 end
+
+
+(* fs_impl_types unit tests *)
+(* key_eq *)
+assert key_eq_should_be_true_on_equal_entries: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 1) = true
+assert key_eq_should_be_false_on_different_entries: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = false
+(* key_lte *)
+assert key_lte_should_be_true_if_first_smaller: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 2) = true
+assert key_lte_should_be_true_if_equal: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 2) (Fs_impl_types.Key 2) = true
+assert key_lte_should_be_false_if_first_greater: Fs_impl_types.key_lte Fs_impl_types.nat_env (Fs_impl_types.Key 3) (Fs_impl_types.Key 2) = false
+(* entry_lt *)
+assert entry_lt_should_be_true_if_first_smaller: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lt_should_be_false_if_equal: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = false
+assert entry_lt_should_be_false_if_first_bigger: Fs_impl_types.entry_lt Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 1) = false
+(* entry_eq *)
+assert entry_eq_should_be_true_if_equal: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 1) = true
+assert entry_eq_should_be_false_if_different: Fs_impl_types.entry_eq Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = false
+(* entry_lte *)
+assert entry_lte_should_be_true_if_first_smaller: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 1) (Fs_impl_types.Entry 2) = true
+assert entry_lte_should_be_true_if_equal: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
+assert entry_lte_should_be_false_if_first_greater: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
 
 module BTree = struct
     open Fs_impl_types
     open Utility
 
-    val sorted_entry_list : forall 'e 'k.
-      env 'e 'k ->
+    val sorted_entry_list : forall 'p 'e 'k.
+      env 'p 'e 'k ->
       list (entry 'e) ->
       bool
     let sorted_entry_list env es =
-      let f1 i =
-        let sorted_es = sort (entry_lt env) es in
-        let s_e = index sorted_es i in
-        let e = index es i in
-        (match (s_e,e) with
-        | (Just s_e, Just e) -> entry_eq env s_e e
-        | _ -> false
-         end)
-      in
-      (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
+      if List.length es = 0 then true
+      else
+        let f1 i =
+          let sorted_es = sort (entry_lt env) es in
+          let s_e = index sorted_es i in
+          let e = index es i in
+          (match (s_e,e) with
+           | (Just s_e, Just e) -> entry_eq env s_e e
+           | _ -> false
+           end)
+        in
+        (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
 
     val union_list_of_entry_set : forall 'e.
       list (set (entry 'e)) ->
@@ -177,9 +339,12 @@ module BTree = struct
         end)
       end)
 
+
+    (* Well formedness *)
+
     (* [wf_btree] defines the invariants of a btree *)
     val wf_btree : forall 'p 'k 'e.
-      env 'e 'k ->
+      env 'p 'e 'k ->
       store 'p 'e 'k ->
       (page_id 'p * set (entry 'e) * nat) ->
       nat ->
@@ -194,7 +359,7 @@ module BTree = struct
             | INode _ -> false
             | LNode (L(es)) -> (
               let n = List.length es in
-              match (n = 0) && (n <= env.fanout) with
+              match (n = n0) && (n <= env.fanout) with
               | false -> false
               | true -> (
                 (* construct a set of entries from es *)
@@ -227,7 +392,7 @@ module BTree = struct
                        relation to maxN? *)
                 match ds with
                 | [] -> false
-                | d1::_ -> (
+                | _::_ -> (
                   let n = n0 in
                   let qq i = nth_from_1 qs i in
                   let ss i = entry_set s0 (qq i) in
@@ -289,4 +454,271 @@ module BTree = struct
             end)
           end)
                                             end)
+
+    (* section 3: insertion as abstract machine rules *)
+
+    (* [split_l] divides a leaf node contents [es] in two leaves
+    separated by a key *)
+    val split_l : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       (nat * entry 'e * list (entry 'e) ) ->
+       (list (entry 'e) * key 'k * list (entry 'e) )
+    let split_l env (i,a,es0) = (
+      let es = ins (a,i,es0) in
+      let (es',es'') = take2 es (List.length es / 2 ) in
+      let k = (
+        match es'' with
+        | [] -> failwith "impossible split_l"
+        | e::_ -> env.entry_to_key e
+        end)
+      in
+      (es',k,es''))
+
+    val split_i : forall 'p 'e 'k.
+      (nat * key 'k * page_id 'p * list (key 'k) * list (page_id 'p)) ->
+      (list (key 'k) *  list (page_id 'p) * key 'k * list (key 'k) *  list (page_id 'p) )
+    let split_i (i,k,q,d,p) = (
+      let _ = (List.length p = ((List.length d) + 1)) in
+      let (d',k'::d'') =
+        let ds = ins (k,i,d) in
+        take2 ds ((List.length ds)/2)
+      in
+      let (p',p'') =
+        let ps = ins (q,i+1,p) in
+        take2 ps ((List.length d')+1)
+      in
+      let _ = (List.length p' = ((List.length d')+1)) in
+      let _ = (List.length p'' = ((List.length d'')+1)) in
+      let _ = ((List.length p') - (List.length p'') <=1) in
+      (d',p',k',d'',p'')
+    )
+
+    (* insertion *)
+    val insert_trans : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       ins_config 'p 'e 'k ->
+       maybe (ins_config 'p 'e 'k)
+    let insert_trans env c0 = (
+      match c0 with
+      | (Insert a,r,pi,sg) -> (
+        match (Map.lookup r sg) with
+        | Just (INode(I(ds,ps))) -> (
+          let i = first ds (fun x -> env.key_lt (env.entry_to_key a) x) in
+          Just(Insert a, nth_from_1 ps i,(r,i)::pi,sg)
+        )
+        | Just (LNode(L(es))) -> (
+          let i = first es (fun x -> key_lte env (env.entry_to_key a) (env.entry_to_key x)) in
+          if test i es (fun x -> key_eq env (env.entry_to_key a) (env.entry_to_key x)) then
+            let l' = LNode(L(replace(a,i,es))) in
+            Just(S,r,pi, Map.insert r l' sg)
+          else if List.length es < env.fanout then
+            let l' = LNode(L(ins(a,i,es))) in
+            Just(S,r,pi, Map.insert r l' sg)
+          else
+            let (es',k,es'') = split_l env (i,a,es) in
+            let l1 = LNode(L(es')) in
+            let l2 = LNode(L(es'')) in
+            let q = env.free_page_id sg in
+            let sg' = Map.insert q l2 (Map.insert r l1 sg) in
+            Just(D(k,q),r,pi,sg'))
+        | Nothing -> failwith "impossible: at least root in"
+        end)
+      | (S,_,((t,_)::pi),sg) -> Just (S,t,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
+      | (D(k,q),_,(t,i)::pi,sg) -> (
+        let (I(d,p)) = (
+          match Map.lookup t sg with
+          | Just (INode inode) -> inode
+          | _ -> failwith "impossible: D"
+          end)
+        in
+        (match ((List.length p) < env.fanout) with
+         | true ->
+            let i' = INode(I(ins(k,i,d),ins(q,i+1,p))) in
+            let sg' = Map.insert t i' sg in
+            Just (S,t,pi,sg')
+         | false ->
+            let (d',p',k',d'',p'') = split_i(i,k,q,d,p) in
+            let i'  = INode(I(d',p'))   in
+            let i'' = INode(I(d'',p'')) in
+            let q' = env.free_page_id sg in
+            let sg' = Map.insert q' i'' (Map.insert t i' sg) in
+            Just (D(k',q'),t,pi,sg')
+         end)
+      )
+      | (S,r,[],sg) -> Just (Ret,r,[],sg)
+      | (D(k,t),r,[],sg) ->
+         let q = env.free_page_id sg in
+         let i' = (INode(I([k],[r;t]))) in
+         let sg' = Map.insert q i' sg in
+         Just(Ret,q,[],sg')
+      | _ -> Nothing
+      end)
+
+    val insert_loop : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       ins_config 'p 'e 'k ->
+       ins_config 'p 'e 'k
+    let rec insert_loop env c0 = (
+      match insert_trans env c0 with
+      | Nothing -> c0
+      | Just c -> insert_loop env c
+      end)
+
+    val inserts_in_tree : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       (page_id 'p * store 'p 'e 'k) ->
+       list (entry 'e) ->
+       (page_id 'p * store 'p 'e 'k)
+    let inserts_in_tree env (r0,s0) l =
+      let dest_root_store (_,r,_,s) = (r,s) in
+      List.foldl (fun (r,s) e ->  dest_root_store(insert_loop env (Insert(e),r,[],s))) (r0,s0) l
+
+    (* section 4: find as abstract machine rules *)
+    val find_trans : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       find_config 'p 'e 'k ->
+       find_config 'p 'e 'k
+    let find_trans env c0 = (
+      match c0 with
+      | (Find k,r,sg) -> (
+        match Map.lookup r sg with
+        | Just (INode(I(ds,ps))) ->
+           let i = first ds (fun x -> env.key_lt k x) in
+           let p = nth_from_1 ps i in
+           (Find k,p,sg)
+        | Just (LNode(L(es))) ->
+           let i = first es (fun x -> key_lte env k (env.entry_to_key x)) in
+           (F_Ret(r,i),r,sg)
+        | Nothing -> (Find k,r,sg) (* failwith "find: invalid root" *)
+        end)
+      | ret -> ret end)
+
+    val find_h : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       find_config 'p 'e 'k ->
+       nat ->
+       (maybe (entry 'e) * page_id 'p * store 'p 'e 'k)
+    let rec find_h env c0 h = (
+      match (h,c0) with
+      | (_,(F_Ret (r,i),_,sg)) -> (
+        match Map.lookup r sg with
+        | Nothing -> (Nothing,r,sg)
+        | Just (LNode(L(qs))) -> ((List.index qs i),r,sg)
+        | _ -> (Nothing,r,sg) (*failwith "impossible: inode should not be returned"*)
+        end)
+      | (0,(_,r,sg)) -> (Nothing,r,sg)
+      | _ -> find_h env (find_trans env c0) (h-1)
+      end)
 end
+
+(* sorted_entry_list *)
+assert sorted_entry_should_be_true_if_list_in_increasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
+assert sorted_entry_should_be_true_if_empty_list: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = true
+assert sorted_entry_should_be_false_if_list_in_decreasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 3); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 1)] = false
+(* union_list_of_entry_set *)
+assert union_list_of_entry_set_should_flatten_list_of_sets_to_set: BTree.union_list_of_entry_set [{(Fs_impl_types.Entry (1:nat))};{(Fs_impl_types.Entry 2)}] = Set.insert (Fs_impl_types.Entry 1) {(Fs_impl_types.Entry 2)}
+(* entry_set *)
+assert entry_set_should_get_0_2_entries_from_leaf_with_0_2: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Set.insert (Fs_impl_types.Entry 0) {(Fs_impl_types.Entry 2)}
+assert entry_set_should_get_0_2_3_5_entries_from_inode_pointing_to_leaves: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = (Set.fromList [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)])
+assert entry_set_should_return_empty_when_id_not_in_store: BTree.entry_set ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = {}
+assert entry_set_should_return_empty_when_empty_store: BTree.entry_set ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = {}
+(* get_m *)
+assert get_m_should_return_nothing_when_empty_store: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Nothing
+assert get_m_should_return_nothing_when_id_not_in_store: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
+assert get_m_should_return_2_when_id_points_to_leaf_0_2: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Just (2:nat)
+assert get_m_should_return_2_when_id_points_to_inode_pointing_to_2_leaves: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) = Just (2:nat)
+(* inserts_in_tree *)
+assert inserts_in_tree_should_insert_an_entry_in_root: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 0] = (Fs_impl_types.Page_id 0,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0])))])):Fs_impl_types.store nat nat nat))
+assert inserts_in_tree_should_have_an_inode_and_two_leaves: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5] = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
+assert inserts_in_tree_should_not_alter_the_tree_if_entries_are_already_in: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5] = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
+assert inserts_in_tree_should_create_three_inodes_tree: BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11] = (Fs_impl_types.Page_id 7,(Map.fromList([(Fs_impl_types.Page_id 7,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 7],
+      [Fs_impl_types.Page_id 2; Fs_impl_types.Page_id 6])));
+ (Fs_impl_types.Page_id 6,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 9],
+      [Fs_impl_types.Page_id 4; Fs_impl_types.Page_id 5])));
+ (Fs_impl_types.Page_id 5,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 9; Fs_impl_types.Entry 10;
+      Fs_impl_types.Entry 11]));
+ (Fs_impl_types.Page_id 4,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 7; Fs_impl_types.Entry 8]));
+ (Fs_impl_types.Page_id 3,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 5; Fs_impl_types.Entry 6]));
+ (Fs_impl_types.Page_id 2,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 3; Fs_impl_types.Key 5],
+      [Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1;
+       Fs_impl_types.Page_id 3])));
+ (Fs_impl_types.Page_id 1,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 3; Fs_impl_types.Entry 4]));
+ (Fs_impl_types.Page_id 0,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))]):Fs_impl_types.store nat nat nat))
+(* wf_btree *)
+assert wf_btree_should_be_true_on_store_equal_to_empty_btree: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 1 = true
+assert wf_btree_should_be_false_when_first_node_lenght_is_wrong: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},1) 1 = false
+assert wf_btree_should_be_false_when_height_is_0: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 0 = false
+assert wf_btree_should_be_false_when_btree_is_empty_and_given_height_is_2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{},0) 2 = false
+assert wf_btree_should_be_false_when_the_root_id_does_not_exist: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 1),{},0) 1 = false
+assert wf_btree_should_be_false_when_entry_set_has_an_entry_but_the_store_is_empty: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 0),{Fs_impl_types.Entry 0},0) 1 = false
+assert wf_btree_should_be_false_when_empty_btree_has_an_inode: BTree.wf_btree Fs_impl_types.nat_env (Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.INode(Fs_impl_types.I([],[])))])) ((Fs_impl_types.Page_id 0),{},0) 1 = false
+assert wf_btree_should_be_false_when_root_id_is_not_in_store_and_given_heigh_is_2: BTree.wf_btree Fs_impl_types.nat_env Fs_impl_types.nat_empty_btree_store ((Fs_impl_types.Page_id 1),{},0) 2 = false
+assert wf_btree_after_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]),2) 2) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) = true
+assert wf_btree_should_be_true_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),2) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = true
+assert wf_btree_should_be_false_with_a_wrong_n_after_3_inode_inserts: (fun (r,s) -> BTree.wf_btree Fs_impl_types.nat_env s (r,(Set.fromList [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5;Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]),3) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = false
+
+(* example of lemma *)
+lemma wf_btree_false_empty_tree: (forall e s c. BTree.wf_btree e s c 0 = false)
+(* find *)
+assert find_h_should_find_nothing_in_a_store_containing_an_empty_root: BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = (Nothing,(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store)
+assert find_h_should_find_entry_11_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 11),Fs_impl_types.Page_id 5,(Map.fromList([(Fs_impl_types.Page_id 7,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 7],
+      [Fs_impl_types.Page_id 2; Fs_impl_types.Page_id 6])));
+ (Fs_impl_types.Page_id 6,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 9],
+      [Fs_impl_types.Page_id 4; Fs_impl_types.Page_id 5])));
+ (Fs_impl_types.Page_id 5,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 9; Fs_impl_types.Entry 10;
+      Fs_impl_types.Entry 11]));
+ (Fs_impl_types.Page_id 4,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 7; Fs_impl_types.Entry 8]));
+ (Fs_impl_types.Page_id 3,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 5; Fs_impl_types.Entry 6]));
+ (Fs_impl_types.Page_id 2,
+  Fs_impl_types.INode
+   (Fs_impl_types.I
+     ([Fs_impl_types.Key 3; Fs_impl_types.Key 5],
+      [Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1;
+       Fs_impl_types.Page_id 3])));
+ (Fs_impl_types.Page_id 1,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 3; Fs_impl_types.Entry 4]));
+ (Fs_impl_types.Page_id 0,
+  Fs_impl_types.LNode
+   (Fs_impl_types.L
+     [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))])))
