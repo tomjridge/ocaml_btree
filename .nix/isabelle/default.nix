@@ -32,7 +32,7 @@ stdenv.mkDerivation {
       sha256 = "1aa3vz2nnkkyd4mlsqbs69jqfxlll5h0k5fj9m1j9wqiddqwvwcf";
     }
     else fetchurl {
-      url = http://isabelle.in.tum.de/dist/Isabelle2014_linux.tar.gz;
+      url = http://isabelle.in.tum.de/website-Isabelle2014/dist/Isabelle2014_linux.tar.gz;
       sha256 = "0z81pwwllavka4r57fx6yi9kbpbb9xbanp8dsjix49qpyj2a72jy";
 #      url = http://isabelle.in.tum.de/dist/Isabelle2015_linux.tar.gz;
 #      sha256 = "c2a0dee5eb698b4a7f2fa785316e32682d67c36aabbc1f683cbca2860aa9788e";
