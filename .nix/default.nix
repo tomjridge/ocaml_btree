@@ -22,7 +22,7 @@ in stdenv.mkDerivation {
     # eval "${!curPhase:-$curPhase}"
     buildPhase = ''
       echo lemenv execute the following using buildPhase from nix-shell
-      cd ${lem}/lem
+      cd lem #${lem}/lem
       echo pwd is $PWD
       export USER_HOME=$out
       echo USER_HOME: $USER_HOME
