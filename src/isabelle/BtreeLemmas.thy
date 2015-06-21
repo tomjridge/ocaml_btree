@@ -87,4 +87,13 @@ apply (induct h)
       apply auto
 done
 
+(* this lemma is not useful as it is.
+  We would like to show that find_entry behaves as a map look up.
+  The map should be from key to entry. (for this we need to define an op that translates the btree in a map?)
+  The key in the configuration passed to find_h is fundamental to state the equality. (the lemma should be something like: find_h_stuff = k m)
+*)
+lemma find_entry_equal_to_map:
+"\<forall> env c h p i s . ((find_h env c h) = (Some(p,i),s)) \<longrightarrow> (find_entry (Some(p,i),s) = (case s p of (Some(LNode(L es))) \<Rightarrow> Some(nth_from_1 es i) | _ \<Rightarrow> None)) "
+apply (simp add:find_entry.simps)
+done
 end

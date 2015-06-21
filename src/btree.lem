@@ -616,12 +616,10 @@ module BTree = struct
       end)
 
     val find_entry : forall 'p 'e 'k.
-       env 'p 'e 'k ->
-       find_config 'p 'e 'k ->
-       nat ->
+       (maybe (page_id 'p * nat) * store 'p 'e 'k) ->
        (maybe (entry 'e))
-    let find_entry env c h = (
-      match (find_h env c h) with
+    let find_entry c = (
+      match c with
       | (Just(p,i),s) -> (
          match Map.lookup p s with
          | Just(LNode(L(es))) -> Just (nth_from_1 es i)
@@ -743,5 +741,5 @@ assert find_h_should_find_page_id_5_and_index_2_in_a_store_containing_three_inod
    (Fs_impl_types.L
      [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))])))
 (* find_entry *)
-assert find_entry_should_find_nothing_in_an_empty_root_store:  BTree.find_entry Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = Nothing
-assert find_entry_should_find_entry_10_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_entry Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 10))
+assert find_entry_should_find_nothing_in_an_empty_root_store:  BTree.find_entry (BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1) = Nothing
+assert find_entry_should_find_entry_10_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_entry (BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3)) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 10))
