@@ -254,10 +254,6 @@ module Fs_impl_types = struct
     type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
     type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
 
-    val dest_find_config_store : forall 'p 'e 'k.
-      find_config 'p 'e 'k ->
-      store 'p 'e 'k
-    let dest_find_config_store (_,_,s) = s
 end
 
 
@@ -592,9 +588,9 @@ module BTree = struct
            let p = nth_from_1 ps i in
            (Find k,p,sg)
         | Just (LNode(L(es))) ->
-           let i = first es (fun x -> key_lte env k (env.entry_to_key x)) in
+           let i = (first es (fun x -> key_lte env k (env.entry_to_key x))) in
            (F_Ret(r,i),r,sg)
-        | Nothing -> (Find k,r,sg) (* failwith "find: invalid root" *)
+        | Nothing -> (Find k,r,sg) (* page id does not exist in store *)
         end)
       | ret -> ret end)
 
@@ -602,17 +598,36 @@ module BTree = struct
        env 'p 'e 'k ->
        find_config 'p 'e 'k ->
        nat ->
-       (maybe (entry 'e) * page_id 'p * store 'p 'e 'k)
-    let rec find_h env c0 h = (
-      match (h,c0) with
-      | (_,(F_Ret (r,i),_,sg)) -> (
-        match Map.lookup r sg with
-        | Nothing -> (Nothing,r,sg)
-        | Just (LNode(L(qs))) -> ((List.index qs i),r,sg)
-        | _ -> (Nothing,r,sg) (*failwith "impossible: inode should not be returned"*)
+       (maybe (page_id 'p * nat) * store 'p 'e 'k)
+    let rec find_h env c h = (
+      match h with
+      | 0 -> (
+        match c with
+        | (F_Ret(p,n),_,s0) -> (Just(p,n),s0)
+        | (_,_,s0) -> (Nothing,s0)
         end)
-      | (0,(_,r,sg)) -> (Nothing,r,sg)
-      | _ -> find_h env (find_trans env c0) (h-1)
+      | _ -> (
+        match c with
+        | (F_Ret(p,n),_,s0) -> (Just(p,n),s0)
+        | (_,_,s0) ->
+           let c' = find_trans env c in
+           find_h env c' (h-1)
+        end)
+      end)
+
+    val find_entry : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       find_config 'p 'e 'k ->
+       nat ->
+       (maybe (entry 'e))
+    let find_entry env c h = (
+      match (find_h env c h) with
+      | (Just(p,i),s) -> (
+         match Map.lookup p s with
+         | Just(LNode(L(es))) -> Just (nth_from_1 es i)
+         | _ -> Nothing
+         end)
+      | _ -> Nothing
       end)
 end
 
@@ -689,8 +704,8 @@ assert wf_btree_should_be_false_with_a_wrong_n_after_3_inode_inserts: (fun (r,s)
 (* example of lemma *)
 lemma wf_btree_false_empty_tree: (forall e s c. BTree.wf_btree e s c 0 = false)
 (* find *)
-assert find_h_should_find_nothing_in_a_store_containing_an_empty_root: BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = (Nothing,(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store)
-assert find_h_should_find_entry_11_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 11),Fs_impl_types.Page_id 5,(Map.fromList([(Fs_impl_types.Page_id 7,
+assert find_h_should_find_nothing_in_a_store_containing_an_empty_root: BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = (Nothing,Fs_impl_types.nat_empty_btree_store)
+assert find_h_should_find_page_id_5_and_index_2_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Page_id 5,2),(Map.fromList([(Fs_impl_types.Page_id 7,
   Fs_impl_types.INode
    (Fs_impl_types.I
      ([Fs_impl_types.Key 7],
@@ -727,3 +742,6 @@ assert find_h_should_find_entry_11_in_a_store_containing_three_inodes_and_key_10
   Fs_impl_types.LNode
    (Fs_impl_types.L
      [Fs_impl_types.Entry 1; Fs_impl_types.Entry 2]))])))
+(* find_entry *)
+assert find_entry_should_find_nothing_in_an_empty_root_store:  BTree.find_entry Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 3),(Fs_impl_types.Page_id 0),Fs_impl_types.nat_empty_btree_store) 1 = Nothing
+assert find_entry_should_find_entry_10_in_a_store_containing_three_inodes_and_key_10: (fun (r,s) -> BTree.find_entry Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10),r,s) 3) (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 6;Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 9;Fs_impl_types.Entry 10;Fs_impl_types.Entry 11]) = (Just (Fs_impl_types.Entry 10))

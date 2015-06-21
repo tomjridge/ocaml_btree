@@ -15,9 +15,9 @@ Interactive before anything else:
 
 
 open Btree
-open Utility
-open Fs_impl_types
-open BTree
+(* open Utility *)
+(* open Fs_impl_types *)
+(* open BTree *)
 
 let bindings store = Pmap.fold (fun k d a -> (k,d)::a ) store []
 
@@ -27,5 +27,5 @@ let _ = bindings s
 let (r',s') = (BTree.inserts_in_tree Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry( 6);Fs_impl_types.Entry( 7);Fs_impl_types.Entry( 8);Fs_impl_types.Entry( 9);Fs_impl_types.Entry( 10);Fs_impl_types.Entry( 11)])
 let _ = bindings s'
 
-let (i,q,s') = BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10), r',s') 3
+let (i,s') = BTree.find_h Fs_impl_types.nat_env (Fs_impl_types.Find(Fs_impl_types.Key 10), r',s') 3
 let _ = bindings s'
