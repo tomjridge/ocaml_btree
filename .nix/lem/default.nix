@@ -42,14 +42,16 @@ in stdenv.mkDerivation {
   
     installPhase = ''
 mkdir -p $out/lem && cp -R -L * $out/lem
-mkdir $out/bin
-cat > $out/bin/lem <<EOF
-#!/bin/bash
-export LEMLIB=$out/lem/library
-echo export LEMLIB=$out/lem/library
-$out/lem/lem "\$@"
-EOF
-chmod u+x $out/bin/lem
+
+# mkdir $out/bin
+# cat > $out/bin/lem <<EOF
+# #!/bin/bash
+# export LEMLIB=$out/lem/library
+# echo export LEMLIB=$out/lem/library
+# $out/lem/lem "\$@"
+# EOF
+# chmod u+x $out/bin/lem
+
 #ln -s $out/lem/lem $out/bin/lem 
 ''; # so we can inspect the result
     # note that we need to export LEM_LIBRARY_PATH=<absolute path to lem directory>/library before invoking lem

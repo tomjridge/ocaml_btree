@@ -7,6 +7,9 @@ let
     lem = import ./lem { };
 in stdenv.mkDerivation {
     name = "lemenv";
+
+    lem = lem;
+    isabelle = isabelle;
   
     src = fetchgit {
       url = https://github.com/tomjridge/p3.git;
@@ -26,4 +29,9 @@ in stdenv.mkDerivation {
   
     installPhase = "false"; # don't want to install
 
+
+shellHook = ''
+    export PATH=$PATH:${lem}/lem
+    export LEMLIB=${lem}/lem/library
+  '';
 }
