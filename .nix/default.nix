@@ -5,6 +5,8 @@ let
     fetchgit = pkgs.fetchgit;
     perl = pkgs.perl;
     isabelle = import ./isabelle { };
+    ocaml = pkgs.ocaml_4_02_1;
+    findlib = pkgs.ocamlPackages_4_02_1.findlib;
     lem = import ./lem { };
 in stdenv.mkDerivation {
     name = "lemenv";
@@ -13,21 +15,22 @@ in stdenv.mkDerivation {
     isabelle = isabelle;
   
     src = lem;  
-    buildInputs = [ perl isabelle lem ]; 
+    buildInputs = [ perl isabelle lem ocaml findlib ]; 
   
     configurePhase = "true"; 	# Skip configure
     
-    # curPhase=buildPhase
-    # export out=/tmp
-    # eval "${!curPhase:-$curPhase}"
     buildPhase = ''
-      echo lemenv execute the following using buildPhase from nix-shell
-      cd lem #${lem}/lem
-      echo pwd is $PWD
-      export USER_HOME=$out
-      echo USER_HOME: $USER_HOME
+      echo lemenv execute the following using eval ... from nix-shell
+      cd ${lem}/lem
       isabelle build -d isabelle-lib -b LEM
+
+#      export ISABELLE_PATH=$isabelle/Isabelle2014/heaps
+#      export USER_HOME=$out
+#      echo USER_HOME: $USER_HOME
+
       '';
+
+# eval "${!curPhase:-$curPhase}" from nix-shell
   
     installPhase = "true"; # don't want to install
 
@@ -36,11 +39,10 @@ shellHook = ''
     export LEMPATH=${lem}/lem
     export PATH=$PATH:${lem}/lem
     export LEMLIB=${lem}/lem/library
-    #export ISABELLE_LOGIC=LEM
     curPhase=buildPhase
-    export out=/tmp/isa
-    
+
+    # export out=/tmp/isa
+    #export ISABELLE_LOGIC=LEM
   '';
-    #eval "${!curPhase:-$curPhase}"
 
 }
