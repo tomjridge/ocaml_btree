@@ -22,12 +22,8 @@ module Utility = struct
     val nth_from_1 : forall 'a.
       list 'a ->
       nat ->
-      'a
-    let nth_from_1 xs i =
-      (match index xs (i-1) with
-      | Just el -> el
-      | _ -> failwith "nth_from_1"
-       end)
+      maybe 'a
+    let nth_from_1 xs i = index xs (i-1)
 
     (* a list containing i..j; hacky *)
     val from_to :
@@ -48,11 +44,11 @@ module Utility = struct
        ('a -> bool) ->
        nat ->
        nat
-    let rec first_helper xs p i =
-      if i <= List.length xs then
-        if p (nth_from_1 xs i) then i else first_helper xs p (i+1)
-      else
-        (List.length xs) + 1
+    let rec first_helper xs p i = (
+      match (nth_from_1 xs i) with
+      | Just e -> if p e then i else first_helper xs p (i+1)
+      | _ -> i
+      end)
 
     val first : forall 'a.
        list 'a ->
@@ -69,10 +65,10 @@ module Utility = struct
        ('a -> bool) ->
        bool
     let test k xs p = (
-      if (1 <= k && k <= List.length xs) then
-        p (nth_from_1 xs k)
-      else false
-    )
+      match (nth_from_1 xs k) with
+      | Just e -> p e
+      | _ -> false
+      end)
 
   (* [replace] updates the value of [xs] at
                         index [i] with the new value [a] *)
@@ -222,7 +218,7 @@ module Fs_impl_types = struct
 
     (* find types *)
     type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
-    type find_config 'p 'e 'k = find_comm 'p 'e 'k * page_id 'p * store 'p 'e 'k
+    type find_config 'p 'e 'k = maybe (find_comm 'p 'e 'k) * page_id 'p * store 'p 'e 'k
 
 end
 
@@ -345,22 +341,39 @@ module BTree = struct
                 | _::_ -> (
                   let n = n0 in
                   let qq i = nth_from_1 qs i in
-                  let ss i = entry_set s0 (qq i) in
-                  let mm i = get_m s0 (qq i) in
+                  let ss i = (
+                    match qq i with
+                    | Just qi -> Just (entry_set s0 qi)
+                    | _ -> Nothing
+                    end)
+                  in
+                  let mm i = (
+                    match qq i with
+                    | Just qi -> get_m s0 qi
+                    | _ -> Nothing
+                    end)
+                  in
                   let dd i = nth_from_1 ds i in
                   let rec_clause =
                     let pred i =
-                      let (qi,si,mi) = (qq i, ss i, mm i) in
-                      (match mi with
-                      | Nothing -> false
-                      | Just mi -> (wf_btree env s0 (qi,si,mi) h)
+                      let c = (qq i, ss i, mm i) in
+                      (match c with
+                      | (Just qi, Just si, Just mi) -> (wf_btree env s0 (qi,si,mi) h)
+                      | _ -> false
                        end)
                     in
                     List.all pred (from_to 1 n)
                   in
                   let union_clause =
+                    let entry_sets = (List.map ss (from_to 1 n)) in
+                    if any ((=) Nothing) entry_sets
+                    then false
+                    else
+                      let entry_sets' =
+                        foldl (fun acc e -> (match e with | Just e' -> e'::acc | _ -> acc end)) [] entry_sets
+                      in
                     (* check S = S_1 Un ... *)
-                    let union' = union_list_of_entry_set (List.map ss (from_to 1 n)) in
+                    let union' = union_list_of_entry_set entry_sets' in
                     setEqual ss0 union'
                   in
                   let cond_sj = (
@@ -369,9 +382,13 @@ module BTree = struct
                       let sj' = ss (j+1) in
                       let dj  = dd j     in
                       let dj' = dd (j+1) in
-                      Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
-                      &&
-                        Set.all (fun s -> env.key_lt (env.entry_to_key s) dj') sj'
+                      (match (sj',dj,dj') with
+                      | (Just sj', Just dj, Just dj') ->
+                         Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
+                         &&
+                           Set.all (fun s -> env.key_lt (env.entry_to_key s) dj') sj'
+                      | _ -> false
+                       end)
                     in
                     List.all f3 js
                   )
@@ -391,12 +408,20 @@ module BTree = struct
                   let cond_s1 = (
                     let d1 = dd 1 in
                     let s1 = ss 1 in
-                    Set.all (fun s -> env.key_lt (env.entry_to_key s) d1 ) s1)
+                    (match (d1,s1) with
+                     | (Just d1,Just s1) ->
+                        Set.all (fun s -> env.key_lt (env.entry_to_key s) d1 ) s1
+                     | _ -> false
+                     end))
                   in
                   let cond_sn = (
                     let dn' = dd (n-1) in
                     let sn = ss n in
-                    Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn)
+                    (match (dn',sn) with
+                     | (Just dn',Just sn) ->
+                        Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn
+                     | _ -> false
+                     end))
                   in
                   rec_clause && union_clause && cond_sj && cond_mj && cond_s1 && cond_sn)
                 end)
@@ -453,9 +478,11 @@ module BTree = struct
       | (Insert a,r,pi,sg) -> (
         match (Map.lookup r sg) with
         | Just (INode(I(ds,ps))) -> (
-          let i = first ds (fun x -> env.key_lt (env.entry_to_key a) x) in
-          Just(Insert a, nth_from_1 ps i,(r,i)::pi,sg)
-        )
+          let i = (first ds (fun x -> env.key_lt (env.entry_to_key a) x)) in
+          (match nth_from_1 ps i with
+           | Nothing -> Nothing
+           | Just e -> Just(Insert a,e,(r,i)::pi,sg)
+           end))
         | Just (LNode(L(es))) -> (
           let i = first es (fun x -> key_lte env (env.entry_to_key a) (env.entry_to_key x)) in
           if test i es (fun x -> key_eq env (env.entry_to_key a) (env.entry_to_key x)) then
@@ -471,7 +498,7 @@ module BTree = struct
             let q = env.free_page_id sg in
             let sg' = Map.insert q l2 (Map.insert r l1 sg) in
             Just(D(k,q),r,pi,sg'))
-        | Nothing -> failwith "impossible: at least root in"
+        | _ -> Nothing
         end)
       | (S,_,((t,_)::pi),sg) -> Just (S,t,pi,sg) (* if we did not need to split the tree, we just clean the list of added entries *)
       | (D(k,q),_,(t,i)::pi,sg) -> (
@@ -530,18 +557,20 @@ module BTree = struct
        find_config 'p 'e 'k
     let find_trans env c0 = (
       match c0 with
-      | (Find k,r,sg) -> (
+      | (Just (Find k),r,sg) -> (
         match Map.lookup r sg with
         | Just (INode(I(ds,ps))) ->
            let i = first ds (fun x -> env.key_lt k x) in
-           let p = nth_from_1 ps i in
-           (Find k,p,sg)
-        | Just (LNode(L(es))) ->
-           let i = (first es (fun x -> key_lte env k (env.entry_to_key x))) in
-           (F_Ret(r,i),r,sg)
-        | Nothing -> (Find k,r,sg) (* page id does not exist in store *)
+           (match nth_from_1 ps i with
+            | Just p -> (Just(Find k),p,sg)
+            | _ -> (Nothing,r,sg)
+            end)
+        | Just (LNode(L(es))) -> (
+          let i = (first es (fun x -> key_lte env k (env.entry_to_key x))) in
+          (Just (F_Ret(r,i)),r,sg))
+        | _ -> (Nothing,r,sg) (* page id does not exist in store *)
         end)
-      | ret -> ret end)
+      | _ -> c0 end)
 
     val find_h : forall 'p 'e 'k.
        env 'p 'e 'k ->
@@ -552,12 +581,12 @@ module BTree = struct
       match h with
       | 0 -> (
         match c with
-        | (F_Ret(p,n),_,s0) -> (Just(p,n),s0)
+        | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
         | (_,_,s0) -> (Nothing,s0)
         end)
       | _ -> (
         match c with
-        | (F_Ret(p,n),_,s0) -> (Just(p,n),s0)
+        | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
         | (_,_,s0) ->
            let c' = find_trans env c in
            find_h env c' (h-1)
@@ -571,7 +600,7 @@ module BTree = struct
       match c with
       | (Just(p,i),s) -> (
          match Map.lookup p s with
-         | Just(LNode(L(es))) -> Just (nth_from_1 es i)
+         | Just(LNode(L(es))) -> nth_from_1 es i
          | _ -> Nothing
          end)
       | _ -> Nothing
