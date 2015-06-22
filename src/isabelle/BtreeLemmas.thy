@@ -19,18 +19,24 @@ lemma find_trans_does_not_alter_store [simp]:
 "(find_trans e (a,q,s)) = (b',q',s') \<Longrightarrow> s = s'"
 (* cases of the given configuration *)
 apply (case_tac "a")
-  (* rewrite find_trans: with simp_all F_Ret case is solved*)
-  apply (simp_all add:find_trans.simps)
-  (* (Find(_),r,s) *)
-  apply (case_tac "s q")
-    (* None *)
-    apply auto
+  (* a = None *)
+  apply auto
+  apply (simp_all add:find_trans_def)
 
-    (* Some *)
-    apply (case_tac "aa")
+  (* a = Some aa *)
+  apply (case_tac aa)
+  apply auto
+  (* F_Ret case solved by auto *)
+
+  (* Find case *)
+    apply (case_tac "s q")
     apply auto
       (* Inode *)
+      apply (case_tac aa)
+      apply auto
       apply (case_tac "inode")
+      apply auto
+      apply (case_tac "nth_from_1 b (first aa (key_lt e key))")
       apply auto
 
       (* Lnode *)
@@ -41,7 +47,7 @@ done
 lemma find_h_simps: "
 find_h env c (Suc h) = ( (
         (case  c of
-          (F_Ret(p,n),_,s0) => (Some(p,n),s0)
+          ((Some(F_Ret(p,n)),_,s0)) => (Some(p,n),s0)
         | (_,_,s0) =>
            (let c' = (find_trans env c) in
            find_h env c' ((Suc h)-(1::nat)))
@@ -55,32 +61,49 @@ find_h env c (Suc h) = ( (
 declare find_h.simps [simp del] 
 declare find_h_simps [simp add]
 lemma find_h_does_not_alter_store [simp]:
-"\<forall> c0 p0 s0 opt s1. (find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
+"\<forall> env c0 p0 s0 opt s1. (find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
 apply (induct h)
   (* h = 0 *)
   apply(auto)
   apply (case_tac c0)
+  apply auto
 
-    (* c0 = Find  *)
+    (* c0 = None  *)
     apply (simp add:find_h.simps)
 
-    (* c0 = F_Ret *)
-    apply (simp add:find_h.simps)
+    (* c0 = Some a *)
+    apply (case_tac a)
+    apply auto
+      (* a = Find *)
+      apply (simp add:find_h.simps)
+    
+      (* a = F_Ret *)
+      apply (simp add:find_h.simps)
     
   (* h = Suc nat *)
   apply (case_tac c0)
   apply auto
-  apply (simp add:find_trans.simps)
-  apply (case_tac "s0 p0")
-    (* s0 p0 = None *)
-    apply auto
+    (* c0 = None *)
+    apply (simp add:find_trans_def)
 
-    (* s0 p0 = Some a *)
     apply (case_tac a)
-      (* a = inode *)
+      (* a = F_Ret *)
       apply auto
-      apply (case_tac inode)
+     
+      (* a = Find *)
+      apply (simp add:find_trans_def)
+      apply (case_tac "s0 p0")
+      (* s0 p0 = None *)
       apply auto
+
+      (* s0 p0 = Some a *)
+      apply (case_tac a)
+        (* a = inode *)
+         apply auto
+         apply (case_tac inode)
+         apply auto
+         apply (case_tac " nth_from_1 b (first a (key_lt env key))")
+         apply auto
 
       (* a = lnode *)
       apply (case_tac lnode)
