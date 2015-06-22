@@ -1,14 +1,16 @@
 { }:
 
+# adapted from nixpkgs by tr
+
 let 
     pkgs = import <nixpkgs> {};
     stdenv = pkgs.stdenv;
     fetchurl = pkgs.fetchurl;
     perl = pkgs.perl;
     nettools = pkgs.nettools;
-    java = pkgs.jre;
-    polyml = pkgs.polyml;
-    proofgeneral = pkgs.emacs24Packages.proofgeneral;
+#    java = pkgs.jre;
+#    polyml = pkgs.polyml;
+#    proofgeneral = pkgs.emacs24Packages.proofgeneral;
 
 in
 
@@ -28,18 +30,16 @@ stdenv.mkDerivation {
 
   src = if stdenv.isDarwin
     then fetchurl {
-      url = http://isabelle.in.tum.de/dist/Isabelle2014_macos.tar.gz;
+      url = http://isabelle.in.tum.de/dist/Isabelle2014_macos.tar.gz; # FIXME update
       sha256 = "1aa3vz2nnkkyd4mlsqbs69jqfxlll5h0k5fj9m1j9wqiddqwvwcf";
     }
     else fetchurl {
-      url = http://isabelle.in.tum.de/dist/Isabelle2014_linux.tar.gz;
+      url = http://isabelle.in.tum.de/website-Isabelle2014/dist/Isabelle2014_linux.tar.gz;
       sha256 = "0z81pwwllavka4r57fx6yi9kbpbb9xbanp8dsjix49qpyj2a72jy";
-#      url = http://isabelle.in.tum.de/dist/Isabelle2015_linux.tar.gz;
-#      sha256 = "c2a0dee5eb698b4a7f2fa785316e32682d67c36aabbc1f683cbca2860aa9788e";
     };
 
-  buildInputs = [ perl polyml ]
-             ++ stdenv.lib.optionals (!stdenv.isDarwin) [ nettools java ];
+  buildInputs = [ perl ]
+             ++ stdenv.lib.optionals (!stdenv.isDarwin) [ nettools ];
 
   sourceRoot = dirname;
 
@@ -50,19 +50,20 @@ stdenv.mkDerivation {
       --replace /usr/bin/env $ENV
     substituteInPlace lib/Tools/install \
       --replace /usr/bin/env $ENV
-    substituteInPlace etc/settings \
-      --subst-var-by ML_HOME "${polyml}/bin" \
-      --subst-var-by PROOFGENERAL_HOME "${proofgeneral}/share/emacs/site-lisp/ProofGeneral"
-#    substituteInPlace contrib/jdk/etc/settings \
-#      --replace ISABELLE_JDK_HOME= '#ISABELLE_JDK_HOME='
-    substituteInPlace contrib/polyml-5.5.2-1/etc/settings \
-      --replace 'ML_HOME="$POLYML_HOME/$ML_PLATFORM"' \
-                "ML_HOME=\"${polyml}/bin\""
   '';
 
+#    substituteInPlace etc/settings \
+#      --subst-var-by ML_HOME "${polyml}/bin" \
+#      --subst-var-by PROOFGENERAL_HOME "${proofgeneral}/share/emacs/site-lisp/ProofGeneral"
+#    substituteInPlace contrib/jdk/etc/settings \
+#      --replace ISABELLE_JDK_HOME= '#ISABELLE_JDK_HOME='
+#    substituteInPlace contrib/polyml-5.5.2-1/etc/settings \
+#      --replace 'ML_HOME="$POLYML_HOME/$ML_PLATFORM"' \
+#                "ML_HOME=\"${polyml}/bin\""
+
+
   buildPhase = ''
-#    ISABELLE_JDK_HOME=${java} ./bin/isabelle build -s $theories
-    ./bin/isabelle build -s Pure FOL # $theories
+    # note the -b in the following
   '';
 
   installPhase = ''
@@ -70,6 +71,7 @@ stdenv.mkDerivation {
     mv $TMP/$dirname $out
     cd $out/$dirname
     bin/isabelle install $out/bin
+#    $out/bin/isabelle build -s -b HOL
   '';
 
   meta = {

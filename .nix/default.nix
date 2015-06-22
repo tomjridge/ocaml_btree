@@ -3,27 +3,46 @@ let
     pkgs = import <nixpkgs> {};
     stdenv = pkgs.stdenv;
     fetchgit = pkgs.fetchgit;
+    perl = pkgs.perl;
     isabelle = import ./isabelle { };
+    ocaml = pkgs.ocaml_4_02_1;
+    findlib = pkgs.ocamlPackages_4_02_1.findlib;
     lem = import ./lem { };
 in stdenv.mkDerivation {
     name = "lemenv";
+
+    lem = lem;
+    isabelle = isabelle;
   
-    src = fetchgit {
-      url = https://github.com/tomjridge/p3.git;
-      rev = "0f6c732";
-      sha256 = "5ea4a2486876b2bd382dcdada57593233ac6b1e681539e72d5e144e630aaf1ff";
-    };
-#    src = ./.;  
-    buildInputs = [ isabelle lem ]; 
+    src = lem;  
+    buildInputs = [ perl isabelle lem ocaml findlib ]; 
   
     configurePhase = "true"; 	# Skip configure
     
     buildPhase = ''
-      echo lemenv! execute the following using buildPhase() from nix-shell
+      echo lemenv execute the following using eval ... from nix-shell
       cd ${lem}/lem
       isabelle build -d isabelle-lib -b LEM
+
+#      export ISABELLE_PATH=$isabelle/Isabelle2014/heaps
+#      export USER_HOME=$out
+#      echo USER_HOME: $USER_HOME
+
       '';
+
+# eval "${!curPhase:-$curPhase}" from nix-shell
   
-    installPhase = "false"; # don't want to install
+    installPhase = "true"; # don't want to install
+
+
+shellHook = ''
+    export LEMPATH=${lem}/lem
+    export PATH=$PATH:${lem}/lem
+    export LEMLIB=${lem}/lem/library
+    curPhase=buildPhase
+
+    # export out=/tmp/isa
+    #export ISABELLE_LOGIC=LEM
+  '';
 
 }
