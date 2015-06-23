@@ -110,6 +110,207 @@ apply (induct h)
       apply auto
 done
 
+lemma find_h_does_not_alter_wf_btree1:
+" (wf_btree env s0 (r,ss,n) h) \<and> find_h env (c0,r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0)"
+apply auto
+done
+
+lemma find_trans_of_None_is_None [simp]:
+"\<forall> env p s . find_trans env (None,p,s) = (None,p,s)"
+apply (simp add:find_trans_def)
+done
+
+lemma find_h_of_None_is_None [simp]:
+"\<forall> env p s . find_h env (None,p,s) h = (None,s)"
+apply (induct h)
+  (*h = 0*)
+  apply (simp add:find_h.simps)
+
+  (*h = Suc*)
+  apply auto
+done
+
+lemma find_h_of_F_Ret_is_Some [simp]:
+"\<forall> env p i s . find_h env ((Some(F_Ret (p,i))),p,s) h = (Some(p,i),s)"
+apply (induct h)
+  (*h = 0*)
+  apply (simp add:find_h.simps)
+
+  (*h = Suc*)
+  apply auto
+done
+
+    
+lemma if_find_trans_returns_None_find_h_returns_None [simp]:
+"\<forall> env p s . find_trans env (c,p,s) = (None,p,s) \<longrightarrow> find_h env (c,p,s) h = (None,s)"
+apply auto
+  apply (induct h)
+  (* h = 0 *)
+    apply (case_tac c)
+    (* c = None *)
+    apply (simp add:find_h.simps)
+
+    (* c = Some a *)
+    apply (simp add:find_trans_def)
+    apply auto
+    apply (case_tac a)
+      (* a = F_Ret *)
+      apply auto
+
+      (* a = Find *)
+      apply (case_tac "s p")
+
+        (* s p = None *)
+        apply (simp add:find_h.simps)
+
+        (* s p = Some a *)
+        apply (case_tac a)
+        apply auto
+          (* a = inode *)
+          apply (case_tac inode)
+          apply auto
+          apply (case_tac "nth_from_1 b (first a (key_lt env key))")
+          apply auto
+          apply (simp add:find_h.simps)
+
+          (* a = lnode *)
+          apply (case_tac lnode)
+          apply auto
+
+  (* h = Suc *)
+  apply (case_tac c)
+    (* c = None *)
+    apply auto
+
+    (* c = Some a *)
+    apply (case_tac a)
+    apply auto
+    apply (simp add:find_trans_def)
+done
+
+lemma find_h_always_return_page_id_in_store [simp]:
+"\<forall> env k r s0 s i p. find_h env ((Some(Find k)),r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0) \<and> (p \<in> dom s)"
+apply auto
+  (* the page_id obtained by find is in the store *)
+  apply (induct h)
+    (* h = 0 *)
+    apply auto
+    apply (simp add:find_h.simps)
+
+    (* h = Suc h *)
+    apply (simp add:find_trans_def)
+    apply (case_tac "s0 r")
+      (* s0 r = None *)
+      apply auto
+
+      (* s0 r = Some a *)
+      apply (case_tac a)
+      apply auto
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "nth_from_1 b (first a (key_lt env k))")
+      apply auto
+
+      apply (case_tac lnode)
+      apply (auto)
+      apply (simp add:find_h.simps)
+      apply (case_tac h)
+      apply auto
+done 
+
+(*lemma find_h_always_return_page_id_in_store1 [simp]:
+"\<forall> env k r s i p ss n. (find_h env ((Some(Find k)),r,s) h = (Some(p,i),s) \<and> (wf_btree env s (r,ss,n) h) ) \<longrightarrow> (p \<in> dom s)"
+apply auto
+apply (induct h rule:wf_btree.induct)
+  (* h = 0 *)
+  apply auto
+  apply (simp add:find_trans_def)
+  apply (case_tac "s ra")
+    (* s r = None *)
+    apply auto
+
+    (* s r = Some a *)
+    apply (case_tac a)
+      (* a= inode *)
+      apply auto
+
+      apply (case_tac lnode)
+      apply auto
+      apply (simp add:find_h.simps)
+
+      (* h = Suc *)
+      apply (case_tac "s ra")
+        (* s ra = None *)
+        apply auto
+
+        apply (case_tac a)
+          (* a = lnode *)
+          apply auto
+
+          (* a = inode *)
+          apply (case_tac inode)
+          apply auto
+          apply (case_tac "n = length b \<and> Suc (length a) = length b")
+            apply auto
+
+            apply (case_tac a)
+            apply auto
+
+oops*)
+
+lemma find_h_is_correct:
+"\<forall> env s r ss n k p i es. find_h env ((Some(Find k)),r,s) h = (Some(p,i),s) \<longrightarrow> (p \<in> dom s) 
+\<and> (case (s p) of (Some(LNode(L(es)))) \<Rightarrow> (case (nth_from_1 es i) of Some e \<Rightarrow> (e \<in> (entry_set s p)) \<and> (k = (entry_to_key env e)) | _ \<Rightarrow> True) | _ \<Rightarrow> False)"
+apply auto
+  (* the page_id obtained by find is in the store *)
+  apply (induct h)
+    (* h = 0 *)
+    apply (case_tac "s p")
+      (* s p = None*)
+      apply (simp add:find_h.simps)
+
+      apply (case_tac a)
+        (* a = inode *)
+        apply auto
+        apply (simp add:find_h.simps)
+
+        (* a = lnode*)
+        apply (simp add:find_h.simps)
+
+    (* h = Suc h *)
+    apply (simp add:find_trans_def)
+    apply (case_tac "s r")
+      apply auto
+
+      apply (case_tac a)
+        apply auto
+        apply (case_tac inode)
+        apply auto
+        apply (case_tac "nth_from_1 b (first a (key_lt env k))")
+        apply auto
+
+        apply (case_tac lnode)
+        apply auto
+        apply (case_tac "nth_from_1 list (first list (\<lambda>x. key_lte env k (entry_to_key env x)))")
+        apply auto
+        
+
+        (* we have only find_h on F_Ret in the recursive call *)
+        apply (simp add:find_h.simps)
+        apply auto
+        apply (case_tac h)
+          apply auto
+          apply (case_tac "nth_from_1 list (first list (\<lambda>x. key_lte env k (entry_to_key env x)))")
+          apply auto
+          apply (case_tac "s p")
+          apply auto
+          apply (case_tac a)
+          apply auto
+
+
+done
+
+
 (* this lemma is not useful as it is.
   We would like to show that find_entry behaves as a map look up.
   The map should be from key to entry. (for this we need to define an op that translates the btree in a map?)
