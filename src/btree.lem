@@ -245,6 +245,10 @@ module Fs_impl_types = struct
     type find_comm 'p 'e 'k = Find of key 'k | F_Ret of (page_id 'p * nat)
     type find_config 'p 'e 'k = maybe (find_comm 'p 'e 'k) * page_id 'p * store 'p 'e 'k
 
+    (* delete types *)
+    type delete_comm 'p 'e 'k = Delete of entry 'e | DUp | DRem of nat | D_Ret
+    type delete_config 'p 'e 'k = delete_comm 'p 'e 'k * page_id 'p * (list (page_id 'p * nat)) * store 'p 'e 'k
+
 end
 
 module BTree = struct
@@ -643,4 +647,30 @@ module BTree = struct
          end)
       | _ -> Nothing
       end)
+
+
+    val delete_trans : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       delete_config 'p 'e 'k ->
+       maybe (delete_config 'p 'e 'k)
+    let delete_trans env c0 = Just c0
+
+    val delete_loop : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       delete_config 'p 'e 'k ->
+       delete_config 'p 'e 'k
+    let rec delete_loop env c0 = (
+      match delete_trans env c0 with
+      | Nothing -> c0
+      | Just c0 -> delete_loop env c0
+      end)
+
+    val delete_entries : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       (page_id 'p * store 'p 'e 'k) ->
+       list (entry 'e) ->
+       (page_id 'p * store 'p 'e 'k)
+    let delete_entries env (r0,s0) l =
+      let dest_root_store (_,r,_,s) = (r,s) in
+      List.foldl (fun (r,s) e ->  dest_root_store(delete_loop env (Delete(e),r,[],s))) (r0,s0) l
 end
