@@ -695,6 +695,14 @@ module BTree = struct
              end)
         | _ -> Nothing
         end)
+      | (DUp,r,pp,sg) -> (
+        match pp with
+        | (t,_)::pp' -> (* DUp *)
+           Just (DUp,t,pp',sg)
+        | [] -> (* DRootNoGrow *)
+           Just (D_Ret,r,[],sg)
+        end)
+      | (D_Ret,r,[],sg) -> Nothing
       end)
 
     val delete_loop : forall 'p 'e 'k.

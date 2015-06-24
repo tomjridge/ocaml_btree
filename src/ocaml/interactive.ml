@@ -31,3 +31,7 @@ let (i,s') = BTree.find_h Fs_impl_types.nat_env (Some(Fs_impl_types.Find(Fs_impl
 let _ = bindings s'
 
 let _ = BTree.find_h Fs_impl_types.nat_env (Some(Fs_impl_types.Find(Fs_impl_types.Key 10)), Fs_impl_types.Page_id( 0) ,Fs_impl_types.nat_empty_btree_store) 3
+
+
+let (d_i,d_s) = BTree.delete_entries Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry 4]
+let _ = bindings d_s
