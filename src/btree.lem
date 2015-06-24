@@ -147,6 +147,23 @@ module Utility = struct
         end)
       end)
 
+    val del : forall 'a.
+       (nat * (list 'a)) ->
+       list 'a
+    let rec del (i,xs) = (
+      match i with
+      | 0 -> xs
+      | 1 -> (
+        match xs with
+        | [] -> []
+        | x::xs' -> xs'
+        end)
+      | _ -> (
+        match xs with
+        | [] -> []
+        | x::xs' -> (x::(del ((i-1), xs')))
+        end)
+      end)
 end
 
 module Fs_impl_types = struct
@@ -663,12 +680,19 @@ module BTree = struct
             | Just pi -> Just (Delete c,pi,((r,i)::pp),sg)
             | _ -> Nothing
             end)
-        | Just (LNode(L es)) ->
+        | Just (LNode(L(es))) ->
            if (first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c))) = ((List.length es) + 1)
            then (* DLNoMatch *)
              Just(DUp,r,pp,sg)
-           else
-             Nothing
+           else (
+             match pp with
+             | [] -> (* DLMatchRoot *)
+                let i = first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) in
+                let l' = LNode(L(del(i,es))) in
+                let sg' = Map.insert r l' sg in
+                Just(D_Ret,r,pp,sg')
+             | _ -> Nothing
+             end)
         | _ -> Nothing
         end)
       end)

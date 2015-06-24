@@ -39,7 +39,12 @@ assert take2_should_split_1_3: Utility.take2 [(1:nat);2;3;4] 1 = ([(1:nat)],[2;3
 assert take2_should_split_0_4: Utility.take2 [(1:nat);2;3;4] 0 = ([],[(1:nat);2;3;4])
 assert take2_should_split_4_0: Utility.take2 [(1:nat);2;3;4] 4 = ([(1:nat);2;3;4],[])
 assert take2_should_split_empty_list: Utility.take2 ([]:(list nat)) 4 = ([],[])
-
+(* del *)
+assert del_does_nothing_if_index_wrong: Utility.del (10, [(1:nat)]) = [1]
+assert del_deletes_first_element: Utility.del (1, [(1:nat);2;3;4]) = [2;3;4]
+assert del_deletes_last_element: Utility.del (4, [(1:nat);2;3;4]) = [1;2;3]
+assert del_deletes_middle_element: Utility.del (3, [(1:nat);2;3;4;5]) = [1;2;4;5]
+assert del_does_nothing_if_list_empty: Utility.del (0, ([]:(list nat))) = []
 
 (* fs_impl_types unit tests *)
 (* key_eq *)
