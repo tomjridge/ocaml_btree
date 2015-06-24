@@ -1,5 +1,7 @@
 open import Pervasives Set_extra Assert_extra
 
+(* Note: this btree data structure requires maxN >= 3*)
+
 module Utility = struct
 
     (* insertion sort taken from https://ocaml.org/learn/taste.html*)
@@ -156,7 +158,7 @@ module Utility = struct
       | 1 -> (
         match xs with
         | [] -> []
-        | x::xs' -> xs'
+        | _::xs' -> xs'
         end)
       | _ -> (
         match xs with
@@ -191,7 +193,9 @@ module Fs_impl_types = struct
     type env 'p 'e 'k =
       <|
         (* fanout of the btree *)
-        fanout: nat;
+        maxN: nat;
+        (* minimum elements in leaves *)
+        minN: nat;
         (* entry to key *)
         entry_to_key: entry 'e -> key 'k;
         (* less than on keys *)
@@ -203,7 +207,8 @@ module Fs_impl_types = struct
     val nat_env: env nat nat nat
     let nat_env =
       <|
-        fanout = 4;
+        maxN = 4;
+        minN = 2;
         entry_to_key = (fun (Entry e) -> Key e);
         key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
         free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
@@ -351,7 +356,7 @@ module BTree = struct
             | INode _ -> false
             | LNode (L(es)) -> (
               let n = List.length es in
-              match (n = n0) && (n <= env.fanout) with
+              match (n = n0) && (n <= env.maxN) with
               | false -> false
               | true -> (
                 (* construct a set of entries from es *)
@@ -441,11 +446,10 @@ module BTree = struct
                   in
                   let cond_mj = (
                     let js = from_to 1 n in
-                    let max_2 = (env.fanout + 1) / 2 in
                     let pred j =
                       (match mm j with
                       | Nothing -> false
-                      | Just mj -> max_2 <= mj
+                      | Just mj -> env.minN <= mj
                        end)
                     in
                     List.all pred js
@@ -536,7 +540,7 @@ module BTree = struct
                 Just(S,r,pi, Map.insert r l' sg)
              | _ -> Nothing
              end)
-          else if List.length es < env.fanout then
+          else if List.length es < env.maxN then
             (match ins(a,i,es) with
              | Just es' ->
                 let l' = LNode(L(es')) in
@@ -559,7 +563,7 @@ module BTree = struct
       | (D(k,q),_,(t,i)::pi,sg) -> (
         match Map.lookup t sg with
         | Just (INode (I(d,p))) ->
-           (match ((List.length p) < env.fanout) with
+           (match ((List.length p) < env.maxN) with
             | true -> (
               match (ins(k,i,d),ins(q,i+1,p)) with
               | (Just i1, Just i2) ->
@@ -646,7 +650,7 @@ module BTree = struct
       | _ -> (
         match c with
         | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
-        | (_,_,s0) ->
+        | (_,_,_) ->
            let c' = find_trans env c in
            find_h env c' (h-1)
         end)
@@ -681,17 +685,54 @@ module BTree = struct
             | _ -> Nothing
             end)
         | Just (LNode(L(es))) ->
-           if (first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c))) = ((List.length es) + 1)
+           let i = first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) in
+           if i = ((List.length es) + 1)
            then (* DLNoMatch *)
              Just(DUp,r,pp,sg)
            else (
              match pp with
              | [] -> (* DLMatchRoot *)
-                let i = first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) in
                 let l' = LNode(L(del(i,es))) in
                 let sg' = Map.insert r l' sg in
                 Just(D_Ret,r,pp,sg')
-             | _ -> Nothing
+             | (t,j)::pp' ->
+                if List.length es > env.minN
+                then (* DLMatchOK *)
+                  let l' = LNode(L(del(i,es))) in
+                  let sg' = Map.insert r l' sg in
+                  Just(DUp,t,pp',sg')
+                else (
+                  match Map.lookup t sg with
+                  | Just (INode(I(ds,ps))) -> (
+                    match (nth_from_1 ps (j+1)) with (* this condition is equivalent to j!=|p| (error in the paper |p|-1 is the index starting from 0, but first starts from 1), since nth_from_1 is Nothing only if the index is too large *)
+                    | Just p_p_1 ->
+                       (match Map.lookup p_p_1 sg with
+                        | Just (LNode(L(es'))) ->
+                           if List.length es' > env.minN
+                           then (* DLStealRight *)
+                             (match es' with
+                              | e0::e1::es'' -> (* here we are implicitly stating that minN >= 2 *)
+                                 (match replace((env.entry_to_key e1),j,ds) with
+                                  | Just rep_list ->
+                                     let sg' =
+                                   (Map.insert r (LNode(L(del(i,es)++[e0])))
+                                     (Map.insert p_p_1 (LNode(L(del(1,es'))))
+                                       (Map.insert t (INode(I(rep_list,ps))) sg)))
+                                     in
+                                     Just (DUp,t,pp',sg')
+                                  | _ -> Nothing
+                                 end)
+                              | _ -> Nothing
+                              end)
+                           else (* DLMergeRight*)
+                             Nothing
+                        | _ -> Nothing (* coverage:impossible -- the node must be a lnode since we are at the bottom of the tree *)
+                        end)
+                    | Nothing -> (* steal(merge) left only if we cannot steal from the right leaves *)
+                       Nothing
+                    end)
+                  | _ -> Nothing (* coverage:impossible -- cannot be an lnode: the t is added to pp only if the node was an inode *)
+                  end)
              end)
         | _ -> Nothing
         end)
@@ -702,7 +743,8 @@ module BTree = struct
         | [] -> (* DRootNoGrow *)
            Just (D_Ret,r,[],sg)
         end)
-      | (D_Ret,r,[],sg) -> Nothing
+      | (D_Ret,_,_,_) -> Nothing
+      | _ -> Nothing
       end)
 
     val delete_loop : forall 'p 'e 'k.

@@ -45,7 +45,7 @@ assert del_deletes_first_element: Utility.del (1, [(1:nat);2;3;4]) = [2;3;4]
 assert del_deletes_last_element: Utility.del (4, [(1:nat);2;3;4]) = [1;2;3]
 assert del_deletes_middle_element: Utility.del (3, [(1:nat);2;3;4;5]) = [1;2;4;5]
 assert del_does_nothing_if_list_empty: Utility.del (0, ([]:(list nat))) = []
-
+assert del_does_nothing_if_list_empty_and_index_is_1: Utility.del (1, ([]:(list nat))) = []
 (* fs_impl_types unit tests *)
 (* key_eq *)
 assert key_eq_should_be_true_on_equal_entries: Fs_impl_types.key_eq Fs_impl_types.nat_env (Fs_impl_types.Key 1) (Fs_impl_types.Key 1) = true
@@ -184,3 +184,16 @@ assert find_entry_should_find_entry_10_in_a_store_containing_three_inodes_and_ke
 assert delete_entries_should_not_change_an_empty_store: BTree.delete_entries Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1] = (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store)
 assert delete_entries_should_delete_a_matching_entry_from_the_root: BTree.delete_entries Fs_impl_types.nat_env (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1]) [Fs_impl_types.Entry 1] = (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store)
 assert delete_entries_should_delete_a_matching_entry_from_a_leaf: (BTree.delete_entries Fs_impl_types.nat_env (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) [Fs_impl_types.Entry 4]) = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2])));(Fs_impl_types.Page_id 1,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3;Fs_impl_types.Entry 5])));(Fs_impl_types.Page_id 2,Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 3],[Fs_impl_types.Page_id 0;Fs_impl_types.Page_id 1])))])):Fs_impl_types.store nat nat nat))
+assert delete_entries_should_steal_entry_3_from_right_leaf_to_delete_2: (BTree.delete_entries Fs_impl_types.nat_env (BTree.inserts_in_tree Fs_impl_types.nat_env (Fs_impl_types.Page_id 0,Fs_impl_types.nat_empty_btree_store) [Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 3;Fs_impl_types.Entry 4;Fs_impl_types.Entry 5]) [Fs_impl_types.Entry 2]) = (Fs_impl_types.Page_id 2,((Map.fromList([(Btree.Fs_impl_types.Page_id 2,
+  Btree.Fs_impl_types.INode
+   (Btree.Fs_impl_types.I
+     ([Btree.Fs_impl_types.Key 4],
+      [Btree.Fs_impl_types.Page_id 0; Btree.Fs_impl_types.Page_id 1])));
+ (Btree.Fs_impl_types.Page_id 1,
+  Btree.Fs_impl_types.LNode
+   (Btree.Fs_impl_types.L
+     [Btree.Fs_impl_types.Entry 4; Btree.Fs_impl_types.Entry 5]));
+ (Btree.Fs_impl_types.Page_id 0,
+  Btree.Fs_impl_types.LNode
+   (Btree.Fs_impl_types.L
+     [Btree.Fs_impl_types.Entry 1; Btree.Fs_impl_types.Entry 3]))])):Fs_impl_types.store nat nat nat))

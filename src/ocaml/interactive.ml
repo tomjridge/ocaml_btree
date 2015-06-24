@@ -35,3 +35,7 @@ let _ = BTree.find_h Fs_impl_types.nat_env (Some(Fs_impl_types.Find(Fs_impl_type
 
 let (d_i,d_s) = BTree.delete_entries Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry 4]
 let _ = bindings d_s
+
+(* steal_right *)
+let (d_i,d_s) = BTree.delete_entries Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry 2]
+let _ = bindings d_s
