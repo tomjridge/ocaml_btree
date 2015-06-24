@@ -653,7 +653,19 @@ module BTree = struct
        env 'p 'e 'k ->
        delete_config 'p 'e 'k ->
        maybe (delete_config 'p 'e 'k)
-    let delete_trans env c0 = Just c0
+    let delete_trans env c0 = (
+      match c0 with
+      | (Delete c, r, pp, sg) -> (
+        match (Map.lookup r sg) with
+        | Just (INode(I(ds,ps))) ->
+           let i = first ds (fun x -> env.key_lt (env.entry_to_key c) x) in
+           (match nth_from_1 ps i with
+            | Just pi -> Just (Delete c, pi,((r,i)::pp),sg)
+            | _ -> Nothing
+            end)
+        | _ -> Nothing
+        end)
+      end)
 
     val delete_loop : forall 'p 'e 'k.
        env 'p 'e 'k ->
