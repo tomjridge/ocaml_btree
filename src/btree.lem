@@ -703,34 +703,38 @@ module BTree = struct
                   Just(DUp,t,pp',sg')
                 else (
                   match Map.lookup t sg with
-                  | Just (INode(I(ds,ps))) -> (
-                    match (nth_from_1 ps (j+1)) with (* this condition is equivalent to j!=|p| (error in the paper |p|-1 is the index starting from 0, but first starts from 1), since nth_from_1 is Nothing only if the index is too large *)
-                    | Just p_p_1 ->
-                       (match Map.lookup p_p_1 sg with
-                        | Just (LNode(L(es'))) ->
-                           if List.length es' > env.minN
-                           then (* DLStealRight *)
-                             (match es' with
-                              | e0::e1::es'' -> (* here we are implicitly stating that minN >= 2 *)
-                                 (match replace((env.entry_to_key e1),j,ds) with
-                                  | Just rep_list ->
-                                     let sg' =
+                  | Just (INode(I(ds,ps))) ->
+                     let f1_steal_right = (* we use a maybe constructor to check the steal_right condition *)
+                       (match (nth_from_1 ps (j+1)) with (* this condition is equivalent to j!=|p| (error in the paper |p|-1 is the index starting from 0, but first starts from 1), since nth_from_1 is Nothing only if the index is too large *)
+                        | Just p_p_1 ->
+                           (match Map.lookup p_p_1 sg with
+                            | Just (LNode(L(es'))) ->
+                               if List.length es' > env.minN
+                               then Just (p_p_1, es')
+                               else Nothing
+                            | _ -> Nothing
+                            end)
+                        | _ -> Nothing
+                        end)
+                     in
+                     (match f1_steal_right with
+                      | Just (p_p_1, es') -> (* DLStealRight *)
+                         (match es' with
+                          | e0::e1::es'' -> (* here we are implicitly stating that minN >= 2 *)
+                             (match replace((env.entry_to_key e1),j,ds) with
+                              | Just rep_list ->
+                                 let sg' =
                                    (Map.insert r (LNode(L(del(i,es)++[e0])))
-                                     (Map.insert p_p_1 (LNode(L(del(1,es'))))
-                                       (Map.insert t (INode(I(rep_list,ps))) sg)))
-                                     in
-                                     Just (DUp,t,pp',sg')
-                                  | _ -> Nothing
-                                 end)
+                                               (Map.insert p_p_1 (LNode(L(del(1,es'))))
+                                                           (Map.insert t (INode(I(rep_list,ps))) sg)))
+                                 in
+                                 Just (DUp,t,pp',sg')
                               | _ -> Nothing
                               end)
-                           else (* DLMergeRight*)
-                             Nothing
-                        | _ -> Nothing (* coverage:impossible -- the node must be a lnode since we are at the bottom of the tree *)
-                        end)
-                    | Nothing -> (* steal(merge) left only if we cannot steal from the right leaves *)
-                       Nothing
-                    end)
+                          | _ -> Nothing
+                          end)
+                      | _ -> Nothing (* NEXT PHASES *)
+                      end)
                   | _ -> Nothing (* coverage:impossible -- cannot be an lnode: the t is added to pp only if the node was an inode *)
                   end)
              end)
