@@ -824,7 +824,15 @@ module BTree = struct
                  Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
                in
                Just (D_Ret,r,[],sg')
-          | (t,j)::pp' -> Nothing
+          | (t,j)::pp' ->
+             if List.length ps > env.minN
+             then (* DIOK *)
+               let sg' =
+                 Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
+               in
+               Just (DUp,t,pp',sg')
+             else
+               Nothing
           end)
         | _ -> Nothing
         end)
