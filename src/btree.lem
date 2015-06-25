@@ -720,7 +720,7 @@ module BTree = struct
                      (match f1_steal_right with
                       | Just (pj_p_1, es') -> (* DLStealRight *)
                          (match es' with
-                          | e0::e1::es'' -> (* here we are implicitly stating that minN >= 2 *)
+                          | e0::e1::_ -> (* here we are implicitly stating that minN >= 2 *)
                              (match replace((env.entry_to_key e1),j,ds) with
                               | Just rep_list ->
                                  let sg' =
@@ -815,24 +815,56 @@ module BTree = struct
              if (List.length ps = 2)
              then (* DIRootDrop *)
                (match ps with
-               | p0::_ ->
-                  Just (D_Ret,p0,[],(Map.delete r sg))
-               | _ -> Nothing (* this cannot happen, if the tree is well formed *)
-               end)
+                | p0::_ ->
+                   Just (D_Ret,p0,[],(Map.delete r sg))
+                | _ -> Nothing (* this cannot happen, if the tree is well formed *)
+                end)
              else (* DIRootOK *)
                let sg' =
                  Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
                in
                Just (D_Ret,r,[],sg')
-          | (t,j)::pp' ->
-             if List.length ps > env.minN
-             then (* DIOK *)
-               let sg' =
-                 Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
-               in
-               Just (DUp,t,pp',sg')
-             else
-               Nothing
+          | (t,j)::pp' -> (
+            if List.length ps > env.minN
+            then (* DIOK *)
+              let sg' =
+                Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
+              in
+              Just (DUp,t,pp',sg')
+            else
+              (match (Map.lookup t sg) with
+               | Just (INode(I(ds'',ps''))) ->
+                  let f3_steal_right =
+                    (match nth_from_1 ps'' (j+1) with (* this condition is equivalent to j!=|p''| *)
+                     | Just (p2j_p_1) ->
+                        (match Map.lookup p2j_p_1 sg with
+                         | Just (INode(I(ds',ps'))) ->
+                            if (List.length ps') > env.minN
+                            then Just(p2j_p_1,(ds',ps'))
+                            else Nothing
+                         | _ -> Nothing
+                         end)
+                     | _ -> Nothing
+                     end)
+                  in
+                  (match f3_steal_right with
+                   | Just(p2j_p_1,((d0'::ds'),(p0'::ps'))) -> (* DIStealRight*)
+                      (match (replace(d0',j,ds''), nth_from_1 ds'' j) with
+                       | (Just repl_list, Just dj'') ->
+                          let sg' = (
+                            (Map.insert r (INode(I(del(i-1,ds)++[dj''],del(i,ps)++[p0'])))
+                                                (Map.insert p2j_p_1 (INode(I(ds',ps'))) (* here we are deleting using the above pattern matching instead of the del function *)
+                                                            (Map.insert t (INode(I(repl_list,ps''))) sg))))
+                             in
+                          Just(DUp,t,pp',sg')
+                       | _ -> Nothing
+                       end)
+                   | _ -> (* OTHER PHASES *)
+                      Nothing
+                   end)
+               | _ -> Nothing
+               end)
+          )
           end)
         | _ -> Nothing
         end)
