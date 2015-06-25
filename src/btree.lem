@@ -733,7 +733,42 @@ module BTree = struct
                               end)
                           | _ -> Nothing
                           end)
-                      | _ -> Nothing (* NEXT PHASES *)
+                      | _ ->
+                         let f2_steal_left = (
+                           match not(j = 1) with
+                           | true -> (
+                             match nth_from_1 ps (j-1) with
+                             | Just pj_m_1 -> (
+                               match Map.lookup pj_m_1 sg with
+                               | Just (LNode(L(es'))) ->
+                                  if List.length es' > env.minN
+                                  then Just (pj_m_1, es')
+                                  else Nothing
+                               | _ -> Nothing
+                               end)
+                             | _ -> Nothing (* coverage:impossible -- j cannot be bigger than ps length (see DIDiscend) *)
+                             end)
+                           | _ -> Nothing
+                           end)
+                         in
+                         (match f2_steal_left with
+                          | Just (pj_m_1,es') -> (* DLStealLeft *)
+                             (match (List.reverse es') with
+                              | last_es'::_ -> (
+                                match (replace((env.entry_to_key last_es'),(j-1),ds)) with
+                                | Just rep_list ->
+                                   let sg' =
+                                     (Map.insert r (LNode(L([last_es']++del(i,es))))
+                                                 (Map.insert pj_m_1 (LNode(L(del(List.length es',es'))))
+                                                             (Map.insert t (INode(I(rep_list,ps))) sg)))
+                                   in
+                                   Just (DUp,t,pp',sg')
+                                | _ -> Nothing
+                                end)
+                              | _ -> Nothing
+                              end)
+                          | _ -> Nothing (* MERGE PHASES *)
+                          end)
                       end)
                   | _ -> Nothing (* coverage:impossible -- cannot be an lnode: the t is added to pp only if the node was an inode *)
                   end)
