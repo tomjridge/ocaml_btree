@@ -819,8 +819,11 @@ module BTree = struct
                   Just (D_Ret,p0,[],(Map.delete r sg))
                | _ -> Nothing (* this cannot happen, if the tree is well formed *)
                end)
-             else
-               Nothing
+             else (* DIRootOK *)
+               let sg' =
+                 Map.insert r (INode(I(del(i-1,ds),del(i,ps)))) sg
+               in
+               Just (D_Ret,r,[],sg')
           | (t,j)::pp' -> Nothing
           end)
         | _ -> Nothing
