@@ -39,3 +39,11 @@ let _ = bindings d_s
 (* steal_right *)
 let (d_i,d_s) = BTree.delete_entries Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry 2]
 let _ = bindings d_s
+
+(* merge_right *)
+let (d_i',d_s') = BTree.delete_entries Fs_impl_types.nat_env (d_i,d_s) [Fs_impl_types.Entry 4]
+let _ = bindings d_s'
+
+(* merge_left *)
+let (d_i',d_s') = BTree.delete_entries Fs_impl_types.nat_env (d_i,d_s) [Fs_impl_types.Entry 1]
+let _ = bindings d_s'
