@@ -859,8 +859,41 @@ module BTree = struct
                           Just(DUp,t,pp',sg')
                        | _ -> Nothing
                        end)
-                   | _ -> (* OTHER PHASES *)
-                      Nothing
+                   | _ ->
+                      let f4_steal_left = (
+                        match not(j=1) with
+                        | true -> (
+                          match nth_from_1 ps'' (j-1) with
+                          | Just (p2j_m_1) -> (
+                            match Map.lookup p2j_m_1 sg with
+                            | Just (INode(I(ds',ps'))) ->
+                               if List.length ps' > env.minN
+                               then Just(p2j_m_1,(ds',ps'))
+                               else Nothing
+                            end)
+                          | _ -> Nothing (* coverage:impossible -- this case is covered by the above condition *)
+                          end)
+                        | _ -> Nothing
+                        end)
+                      in
+                      (match f4_steal_left with
+                       | Just (p2j_m_1,(ds',ps')) -> (* DIStealLeft *)
+                          (match (reverse ds',reverse ds'',reverse ps') with
+                           | (last_ds'::_,last_ds''::_,last_ps'::_) ->
+                              (match (replace(last_ds',j-1,ds'')) with
+                               | Just repl_list ->
+                                  let sg' =
+                                    (Map.insert r (INode(I([last_ds'']++(del(i-1,ds)),[last_ps']++(del(i,ps)))))
+                                    (Map.insert p2j_m_1 (INode(I(del((List.length ds'),ds'),del((List.length ps'),ps'))))
+                                    (Map.insert t (INode(I(repl_list,ps''))) sg)))
+                                  in
+                                  Just (DUp,t,pp',sg')
+                               | _ -> Nothing
+                               end)
+                           | _ -> Nothing
+                           end)
+                       | _ -> Nothing (* MERGE PHASES *)
+                       end)
                    end)
                | _ -> Nothing
                end)
