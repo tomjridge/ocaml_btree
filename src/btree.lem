@@ -807,6 +807,24 @@ module BTree = struct
         | [] -> (* DRootNoGrow *)
            Just (D_Ret,r,[],sg)
         end)
+      | (DRem(i),r,pp,sg) -> (
+        match (Map.lookup r sg) with
+        | Just (INode(I(ds,ps))) -> (
+          match pp with
+          | [] ->
+             if (List.length ps = 2)
+             then (* DIRootDrop *)
+               (match ps with
+               | p0::_ ->
+                  Just (D_Ret,p0,[],(Map.delete r sg))
+               | _ -> Nothing (* this cannot happen, if the tree is well formed *)
+               end)
+             else
+               Nothing
+          | (t,j)::pp' -> Nothing
+          end)
+        | _ -> Nothing
+        end)
       | (D_Ret,_,_,_) -> Nothing
       | _ -> Nothing
       end)
