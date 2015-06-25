@@ -247,4 +247,4 @@ assert delete_entries_should_left_merge_leaves_to_delete_3: (BTree.delete_entrie
  (Btree.Fs_impl_types.Page_id 0,
   Btree.Fs_impl_types.LNode
    (Btree.Fs_impl_types.L
-     [Btree.Fs_impl_types.Entry 1; Btree.Fs_impl_types.Entry 2]))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 3]) = (Fs_impl_types.Page_id 2,((Map.fromList([(Fs_impl_types.Page_id 2,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 4])))])):Fs_impl_types.store nat nat nat))
+     [Btree.Fs_impl_types.Entry 1; Btree.Fs_impl_types.Entry 2]))])):Fs_impl_types.store nat nat nat)) [Fs_impl_types.Entry 3]) = (Fs_impl_types.Page_id 0,((Map.fromList([(Fs_impl_types.Page_id 0,Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 1;Fs_impl_types.Entry 2;Fs_impl_types.Entry 4])))])):Fs_impl_types.store nat nat nat))

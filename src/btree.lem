@@ -779,7 +779,19 @@ module BTree = struct
                                      Just (DRem(j+1),t,pp',sg')
                                   | _ -> Nothing
                                   end)
-                              | _ -> Nothing (* DLMergeLeft *)
+                              | _ -> (* DLMergeLeft *)
+                                 (match nth_from_1 ps (j-1) with
+                                  | Just pj_m_1 -> (
+                                    match Map.lookup pj_m_1 sg with
+                                    | Just (LNode(L(es'))) ->
+                                       let sg' =
+                                         Map.insert pj_m_1 (LNode(L((es'++del(i,es)))))
+                                                    (Map.delete r sg)
+                                       in
+                                       Just (DRem(j),t,pp',sg')
+                                    | _ -> Nothing (* coverage:impossible -- pj_m_1 must exist if we got to this point *)
+                                    end)
+                                  end)
                               end)
                           end)
                       end)
