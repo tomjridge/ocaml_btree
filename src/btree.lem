@@ -892,7 +892,41 @@ module BTree = struct
                                end)
                            | _ -> Nothing
                            end)
-                       | _ -> Nothing (* MERGE PHASES *)
+                       | _ ->
+                          (match nth_from_1 ps'' (j+1) with (* this condition is equivalent to j!=|p''| *)
+                           | Just (p2j_p_1) -> (* DIMergeRight *)
+                              (match Map.lookup p2j_p_1 sg with
+                               | Just (INode(I(ds',ps'))) -> (
+                                 match nth_from_1 ds'' j with
+                                 | Just dj'' ->
+                                    let sg' =
+                                      Map.insert r (INode(I((del(i-1,ds))++[dj'']++ds', del(i,ps)++ps')))
+                                                 (Map.delete p2j_p_1 sg)
+                                    in
+                                    Just (DRem(j+1),t,pp',sg')
+                                 | _ -> Nothing (* impossible if the tree is well formed *)
+                                 end)
+                               | _ -> Nothing (* impossible if the tree is well formed *)
+                               end)
+                           | _ -> (* DIMergeLeft *)
+                              (match nth_from_1 ps'' (j-1) with
+                               | Just (p2j_m_1) -> (
+                                 match Map.lookup p2j_m_1 sg with
+                                 | Just (INode(I(ds',ps'))) -> (
+                                   match (nth_from_1 ds'' (j-1)) with
+                                   | Just d2_j_m_1 ->
+                                    let sg' =
+                                      Map.insert p2j_m_1 (INode(I((ds'++[d2_j_m_1]++del(i-1,ds)),(ps'++del(i,ps)))))
+                                                 (Map.delete r sg)
+                                    in
+                                    Just (DRem(j),t,pp',sg')
+                                   | _ -> Nothing (* impossible if tree is well formed *)
+                                     end)
+                                 | _ -> Nothing
+                                 end)
+                               | _ -> Nothing
+                               end)
+                           end)
                        end)
                    end)
                | _ -> Nothing
