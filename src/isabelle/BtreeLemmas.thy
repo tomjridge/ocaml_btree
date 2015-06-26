@@ -213,9 +213,6 @@ apply auto
 
       apply (case_tac lnode)
       apply (auto)
-      apply (simp add:find_h.simps)
-      apply (case_tac h)
-      apply auto
 done 
 
 (*lemma find_h_always_return_page_id_in_store1 [simp]:
