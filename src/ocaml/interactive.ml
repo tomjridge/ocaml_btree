@@ -69,3 +69,9 @@ let (bt_r,bt_s) = (BTree.inserts_in_tree Fs_impl_types.nat_env (r,s) [Fs_impl_ty
 let _ = bindings bt_s
 let (d_i',d_s') = BTree.delete_entries Fs_impl_types.nat_env (bt_r,bt_s) [Fs_impl_types.Entry 7;Fs_impl_types.Entry 87;Fs_impl_types.Entry 4;Fs_impl_types.Entry 1;Fs_impl_types.Entry 2]
 let _ = bindings d_s'
+
+(* merge left inodes *)
+let (bt_r,bt_s) = (BTree.inserts_in_tree Fs_impl_types.nat_env (r,s) [Fs_impl_types.Entry( 1);Fs_impl_types.Entry( 2);Fs_impl_types.Entry( 3);Fs_impl_types.Entry( 4);Fs_impl_types.Entry( 5); Fs_impl_types.Entry( 6);Fs_impl_types.Entry( 7);Fs_impl_types.Entry( 8);Fs_impl_types.Entry( 9);Fs_impl_types.Entry( 10);Fs_impl_types.Entry( 11);Fs_impl_types.Entry( 12);Fs_impl_types.Entry( 13);Fs_impl_types.Entry( 14);Fs_impl_types.Entry( 15);Fs_impl_types.Entry( 16);Fs_impl_types.Entry( 17)])
+let _ = bindings bt_s
+let (d_i',d_s') = BTree.delete_entries Fs_impl_types.nat_env (bt_r,bt_s) [Fs_impl_types.Entry 7;Fs_impl_types.Entry 8;Fs_impl_types.Entry 4;Fs_impl_types.Entry 13;Fs_impl_types.Entry 14]
+let _ = bindings d_s'
