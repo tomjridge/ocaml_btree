@@ -922,9 +922,9 @@ module BTree = struct
                                     Just (DRem(j),t,pp',sg')
                                    | _ -> Nothing (* impossible if tree is well formed *)
                                      end)
-                                 | _ -> Nothing
+                                 | _ -> Nothing (* impossible if tree is well formed *)
                                  end)
-                               | _ -> Nothing
+                               | _ -> Nothing (* impossible if tree is well formed *)
                                end)
                            end)
                        end)
