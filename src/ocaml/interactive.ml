@@ -6,7 +6,8 @@ Interactive before anything else:
 
     #use "topfind";;
     #require "num";;
-    #require "zarith";;
+    #directory "../../src_ext/lem/ocaml-lib/dependencies/zarith";;
+    #load "zarith.cma";;
     #directory "../../src_ext/lem/ocaml-lib/";;
     #load "extract.cma";;
     #directory "gen_ocaml/";;
