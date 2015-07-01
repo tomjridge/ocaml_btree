@@ -416,15 +416,7 @@ module BTree = struct
                     List.all pred (from_to 1 n)
                   in
                   let union_clause =
-                    let entry_sets = (List.map ss (from_to 1 n)) in
-                    if any ((=) Nothing) entry_sets
-                    then false
-                    else
-                      let entry_sets' =
-                        foldl (fun acc e -> (match e with | Just e' -> e'::acc | _ -> acc end)) [] entry_sets
-                      in
-                    (* check S = S_1 Un ... *)
-                    let union' = union_list_of_entry_set entry_sets' in
+                    let union' = entry_set s0 r in
                     setEqual ss0 union'
                   in
                   let cond_sj = (
