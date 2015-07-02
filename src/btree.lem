@@ -25,19 +25,32 @@ module Utility = struct
       list 'a ->
       nat ->
       maybe 'a
-    let nth_from_1 xs i = index xs (i-1)
+    let nth_from_1 xs i = (
+      match i with
+      | 0 -> Nothing
+      | _ -> index xs (i-1)
+      end)
 
     (* a list containing i..j; hacky *)
+
+    val from_to_h :
+      nat ->
+      nat ->
+      list nat
+    let rec from_to_h i t = (
+      match t with
+      | 0 -> [i]
+      | _ -> i::(from_to_h (i+1) (t-1))
+      end)
+
     val from_to :
       nat ->
       nat ->
       list nat
-    let rec from_to i j = (
-      if i=j then [i]
-      else
-        if i<j
-        then i::(from_to (i+1) j)
-        else []
+    let from_to i j = (
+      if i > j
+      then []
+      else from_to_h i (j-i)
     )
 
     (* find the first index of [l] satisfying a predicate [p] *)
@@ -625,6 +638,15 @@ module BTree = struct
           (Just (F_Ret(r,i)),r,sg))
         | _ -> (Nothing,r,sg) (* page id does not exist in store *)
         end)
+      | (Just (F_Ret(r,i)),_,sg) -> (
+         match Map.lookup r sg with
+         | Just (LNode(L(es))) -> (
+           if ((List.index es i) <> Nothing)
+           then
+             (Just (F_Ret(r,i)),r,sg)
+           else (Nothing,r,sg))
+         | _ -> (Nothing,r,sg) (* the F_Ret was corrupted *)
+         end)
       | _ -> c0 end)
 
     val find_h : forall 'p 'e 'k.
@@ -783,6 +805,7 @@ module BTree = struct
                                        Just (DRem(j),t,pp',sg')
                                     | _ -> Nothing (* coverage:impossible -- pj_m_1 must exist if we got to this point *)
                                     end)
+                                  | _ -> Nothing
                                   end)
                               end)
                           end)
@@ -862,6 +885,7 @@ module BTree = struct
                                if List.length ps' > env.minN
                                then Just(p2j_m_1,(ds',ps'))
                                else Nothing
+                            | _ -> Nothing
                             end)
                           | _ -> Nothing (* coverage:impossible -- this case is covered by the above condition *)
                           end)
@@ -928,7 +952,6 @@ module BTree = struct
         | _ -> Nothing
         end)
       | (D_Ret,_,_,_) -> Nothing
-      | _ -> Nothing
       end)
 
     val delete_loop : forall 'p 'e 'k.
