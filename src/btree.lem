@@ -58,17 +58,17 @@ module Utility = struct
        list 'a ->
        ('a -> bool) ->
        nat ->
-       nat
+       maybe nat
     let rec first_helper xs p i = (
       match (nth_from_1 xs i) with
-      | Just e -> if p e then i else first_helper xs p (i+1)
-      | _ -> i
+      | Just e -> if p e then Just i else first_helper xs p (i+1)
+      | _ -> Nothing
       end)
 
     val first : forall 'a.
        list 'a ->
        ('a -> bool) ->
-       nat
+       maybe nat
     let first xs p = (
       first_helper xs p 1
     )
@@ -531,13 +531,23 @@ module BTree = struct
       | (Insert a,r,pi,sg) -> (
         match (Map.lookup r sg) with
         | Just (INode(I(ds,ps))) -> (
-          let i = (first ds (fun x -> env.key_lt (env.entry_to_key a) x)) in
+          let i = (
+            match (first ds (fun x -> env.key_lt (env.entry_to_key a) x)) with
+            | Just i -> i
+            | _ -> List.length ds + 1 (*the key is bigger than all the keys of the INode, so we give the index of the bigger page_id we have *)
+            end)
+          in
           (match nth_from_1 ps i with
            | Nothing -> Nothing
            | Just e -> Just(Insert a,e,(r,i)::pi,sg)
            end))
         | Just (LNode(L(es))) -> (
-          let i = first es (fun x -> key_lte env (env.entry_to_key a) (env.entry_to_key x)) in
+          let i = (
+            match (first es (fun x -> key_lte env (env.entry_to_key a) (env.entry_to_key x))) with
+            | Just i -> i
+            | _ -> List.length es + 1 (*the key is bigger than all the keys of the INode, so we give the index of the bigger page_id we have *)
+            end)
+          in
           if test i es (fun x -> key_eq env (env.entry_to_key a) (env.entry_to_key x)) then
             (match replace(a,i,es) with
              | Just es' ->
@@ -628,14 +638,21 @@ module BTree = struct
       | (Just (Find k),r,sg) -> (
         match Map.lookup r sg with
         | Just (INode(I(ds,ps))) ->
-           let i = first ds (fun x -> env.key_lt k x) in
+           let i = (
+             match first ds (fun x -> env.key_lt k x) with
+             | Just i -> i
+             | _ -> List.length ds + 1
+             end)
+           in
            (match nth_from_1 ps i with
             | Just p -> (Just(Find k),p,sg)
             | _ -> (Nothing,r,sg)
             end)
         | Just (LNode(L(es))) -> (
-          let i = (first es (fun x -> key_lte env k (env.entry_to_key x))) in
-          (Just (F_Ret(r,i)),r,sg))
+          match (first es (fun x -> key_lte env k (env.entry_to_key x))) with
+          | Just i -> (Just (F_Ret(r,i)),r,sg)
+          | _ -> (Nothing,r,sg)
+          end)
         | _ -> (Nothing,r,sg) (* page id does not exist in store *)
         end)
       | (Just (F_Ret(r,i)),_,sg) -> (
@@ -693,34 +710,38 @@ module BTree = struct
       | (Delete c, r, pp, sg) -> (
         match (Map.lookup r sg) with
         | Just (INode(I(ds,ps))) -> (* DIDiscend *)
-           let i = first ds (fun x -> env.key_lt (env.entry_to_key c) x) in
+           let i = (
+             match first ds (fun x -> env.key_lt (env.entry_to_key c) x) with
+             | Just i -> i
+             | _ ->  List.length ds + 1
+             end)
+           in
            (match nth_from_1 ps i with
             | Just pi -> Just (Delete c,pi,((r,i)::pp),sg)
             | _ -> Nothing
             end)
-        | Just (LNode(L(es))) ->
-           let i = first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) in
-           if i = ((List.length es) + 1)
-           then (* DLNoMatch *)
-             Just(DUp,r,pp,sg)
-           else (
-             match pp with
-             | [] -> (* DLMatchRoot *)
-                let l' = LNode(L(del(i,es))) in
-                let sg' = Map.insert r l' sg in
-                Just(D_Ret,r,pp,sg')
-             | (t,j)::pp' ->
-                if List.length es > env.minN
-                then (* DLMatchOK *)
-                  let l' = LNode(L(del(i,es))) in
-                  let sg' = Map.insert r l' sg in
-                  Just(DUp,t,pp',sg')
-                else (
-                  match Map.lookup t sg with
-                  | Just (INode(I(ds,ps))) ->
-                     let f1_steal_right = (* we use a maybe constructor to check the steal_right condition *)
-                       (match (nth_from_1 ps (j+1)) with (* this condition is equivalent to j!=|p| (error in the paper |p|-1 is the index starting from 0, but first starts from 1), since nth_from_1 is Nothing only if the index is too large *)
-                        | Just pj_p_1 ->
+        | Just (LNode(L(es))) -> (
+            match first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) with
+            | Nothing -> (* DLNoMatch *)
+               Just(DUp,r,pp,sg)
+            | Just i -> (
+              match pp with
+              | [] -> (* DLMatchRoot *)
+                 let l' = LNode(L(del(i,es))) in
+                 let sg' = Map.insert r l' sg in
+                 Just(D_Ret,r,pp,sg')
+              | (t,j)::pp' ->
+                 if List.length es > env.minN
+                 then (* DLMatchOK *)
+                   let l' = LNode(L(del(i,es))) in
+                   let sg' = Map.insert r l' sg in
+                   Just(DUp,t,pp',sg')
+                 else (
+                   match Map.lookup t sg with
+                   | Just (INode(I(ds,ps))) ->
+                      let f1_steal_right = (* we use a maybe constructor to check the steal_right condition *)
+                        (match (nth_from_1 ps (j+1)) with (* this condition is equivalent to j!=|p| (error in the paper |p|-1 is the index starting from 0, but first starts from 1), since nth_from_1 is Nothing only if the index is too large *)
+                         | Just pj_p_1 ->
                            (match Map.lookup pj_p_1 sg with
                             | Just (LNode(L(es'))) ->
                                if List.length es' > env.minN
@@ -812,7 +833,8 @@ module BTree = struct
                       end)
                   | _ -> Nothing (* coverage:impossible -- cannot be an lnode: the t is added to pp only if the node was an inode *)
                   end)
-             end)
+              end)
+            end)
         | _ -> Nothing
         end)
       | (DUp,r,pp,sg) -> (
