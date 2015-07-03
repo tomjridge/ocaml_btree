@@ -649,21 +649,13 @@ module BTree = struct
             | _ -> (Nothing,r,sg)
             end)
         | Just (LNode(L(es))) -> (
-          match (first es (fun x -> key_lte env k (env.entry_to_key x))) with
+          match (first es (fun x -> key_eq env k (env.entry_to_key x))) with
           | Just i -> (Just (F_Ret(r,i)),r,sg)
           | _ -> (Nothing,r,sg)
           end)
         | _ -> (Nothing,r,sg) (* page id does not exist in store *)
         end)
-      | (Just (F_Ret(r,i)),_,sg) -> (
-         match Map.lookup r sg with
-         | Just (LNode(L(es))) -> (
-           if ((List.index es i) <> Nothing)
-           then
-             (Just (F_Ret(r,i)),r,sg)
-           else (Nothing,r,sg))
-         | _ -> (Nothing,r,sg) (* the F_Ret was corrupted *)
-         end)
+      | (Just (F_Ret(r,i)),_,sg) -> (Nothing,r,sg) (* we do not allow "hand-made" F_Ret: the function using [find_trans] should catch the generated F_Ret before passing it again to find_trans *)
       | _ -> c0 end)
 
     val find_h : forall 'p 'e 'k.
