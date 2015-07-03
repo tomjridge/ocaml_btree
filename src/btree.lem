@@ -54,24 +54,16 @@ module Utility = struct
     )
 
     (* find the first index of [l] satisfying a predicate [p] *)
-    val first_helper : forall 'a.
-       list 'a ->
-       ('a -> bool) ->
-       nat ->
-       maybe nat
-    let rec first_helper xs p i = (
-      match (nth_from_1 xs i) with
-      | Just e -> if p e then Just i else first_helper xs p (i+1)
-      | _ -> Nothing
-      end)
-
     val first : forall 'a.
        list 'a ->
        ('a -> bool) ->
        maybe nat
     let first xs p = (
-      first_helper xs p 1
-    )
+      let is = List.findIndices p xs in
+      match is with
+      | [] -> Nothing
+      | i::_ -> Just(i+1)
+      end)
 
     (* it checks that predicate [p] on the [k]th element of [xs] *)
     val test : forall 'a.

@@ -16,9 +16,41 @@ termination from_to_h by lexicographic_order
 lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_btree e s c(( 0 :: nat)) \<longleftrightarrow> False))"
 by auto
 
+lemma first_returns_something_only_if [simp]:
+"\<forall> xs p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
+apply auto
+apply (simp add:first_def)
+
+apply (simp add:first_def)
+apply (case_tac "find_indices p xs")
+apply auto
+
+apply (simp add:first_def)
+apply (case_tac "find_indices p xs")
+  apply auto
+  apply (case_tac xs)
+    apply auto
+    
+oops
+lemma ab [simp]:
+"\<forall> a p lista. find_indices p list = a # lista \<longrightarrow> (
+       case index list a of None \<Rightarrow> False | Some e \<Rightarrow> True)"
+apply auto
+apply (induct list)
+  apply auto
+  
+  apply (case_tac "p a")
+    apply auto
+done
+
 lemma nth_from_1_is_like_nth [simp]:
 "\<forall> list n. (nth_from_1 list 0 = None) \<and> (nth_from_1 list (Suc n) = index list n) "
 apply (auto simp add:nth_from_1_def)
+done
+
+lemma find_trans_of_None_is_None [simp]:
+"\<forall> env p s . find_trans env (None,p,s) = (None,p,s)"
+apply (simp add:find_trans_def)
 done
 
 lemma find_trans_does_not_alter_store [simp]:
@@ -48,7 +80,7 @@ apply (case_tac "a")
        
         apply (case_tac lnode)
         apply auto
-        apply (case_tac "first list (\<lambda>x. key_lte env key (entry_to_key env x))")
+        apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
           apply auto
 done
 
@@ -77,7 +109,7 @@ apply (case_tac c)
 
       apply (case_tac lnode)
       apply auto
-      apply (case_tac "first list (\<lambda>x. key_lte env key (entry_to_key env x))")
+      apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
         apply auto
 done        
 
@@ -88,7 +120,7 @@ find_trans env (Some(c),p,s0) = (Some(F_Ret(p,n)),p,s0) \<longrightarrow>
   Find k \<Rightarrow>
 ( case s0 p of
   Some(LNode(L(es))) \<Rightarrow>
-    (case  (first es (\<lambda> x .  key_lte env k ((entry_to_key   env) x))) of
+    (case  (first es (\<lambda> x .  key_eq env k ((entry_to_key   env) x))) of
             Some i => i = n
           | _ => False)
   | _ \<Rightarrow> False)
@@ -112,7 +144,7 @@ apply (case_tac c)
 
       apply (case_tac lnode)
       apply auto
-      apply (case_tac "first list (\<lambda>x. key_lte env key (entry_to_key env x))")
+      apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
         apply auto
 done
 
@@ -133,7 +165,11 @@ done
 lemma find_h_simps2:
 "\<forall> env k ra s va p i. (find_h env (Some (Find k), ra, s) (Suc (Suc va)) = (Some (p, i), s)) = 
 (find_h env (find_trans env (Some (Find k), ra, s)) (Suc va) = (Some (p, i), s))"
-oops
+apply auto
+  apply(simp add:find_h_simps Let_def)
+
+  apply(simp add:find_h_simps )
+done
 
 lemma find_h_None_is_None [simp]:
 "\<forall> env p s . find_h env (None,p,s) h = (None,s)"
@@ -142,7 +178,6 @@ apply (induct h)
   apply (simp add:find_h.simps)
 
   apply (simp add:find_h_simps)
-  apply (simp add:find_trans_def)
 done
 
 lemma find_h_of_F_Ret_is_Some [simp]:
@@ -172,8 +207,7 @@ apply (simp add:find_h.simps)
   apply (case_tac c0)
     (* c0 = None *)
     apply auto
-    apply (simp add:find_trans_def)
-
+    
     (* c0 = Some a *)
     apply (case_tac a)
       apply auto
@@ -191,7 +225,7 @@ apply (simp add:find_h.simps)
 
           apply (case_tac lnode)
           apply auto
-          apply (case_tac "first list (\<lambda>x. key_lte env key (entry_to_key env x))")
+          apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
             apply auto
 done
 
@@ -214,13 +248,12 @@ apply (induct h)
 
         apply (case_tac lnode)
         apply auto
-        apply (case_tac "first list (\<lambda>x. key_lte env k (entry_to_key env x))")
+        apply (case_tac "first list (\<lambda>x. key_eq env k (entry_to_key env x))")
           apply auto
 done
 
-
 lemma find_h_returns_some_only_if [simp]:
-"find_h env (c,r,s) h = (Some(p,i),s) \<longrightarrow>
+"\<forall> env c r s p i. find_h env (c,r,s) h = (Some(p,i),s) \<longrightarrow>
 (
   (h = 0 \<and> (c = (Some(F_Ret(p,i))))) 
 \<or>
@@ -229,5 +262,22 @@ lemma find_h_returns_some_only_if [simp]:
   (\<exists> c'. c' = find_trans env (c,r,s) \<and> find_h env c' (h-(1::nat)) = (Some(p,i),s) )
 )
 "
-oops
+apply (case_tac h)
+  apply auto
+  apply (simp add:find_trans_def Let_def)
+  apply (case_tac c)
+    apply auto
+
+    apply (simp add:find_h.simps)
+    apply (case_tac a)
+      apply auto
+
+   apply (simp add:find_h_simps)
+   apply auto
+   apply (case_tac c)
+    apply auto
+
+    apply (case_tac a)
+      apply auto
+done
 end
