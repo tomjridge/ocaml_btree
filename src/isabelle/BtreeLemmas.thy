@@ -48,7 +48,10 @@ apply auto
 done
 
 lemma find_entry_equal_to_map:
-"\<forall> env k c h s r. find_entry (find_h env (Some(Find k),r,s) h) = 
+"\<forall> env k c h s r. 
+let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
+wf_btree env s (r, (entry_set s r),n) h \<longrightarrow>
+find_entry (find_h env (Some(Find k),r,s) h) = 
 (map_of (foldl (\<lambda> acc l. case l of LNode(L(es)) \<Rightarrow> acc@(map (\<lambda> i. (entry_to_key env i,i)) es) | _ \<Rightarrow> acc) [] (list_of_set (Map.ran s)))) k"
 (* the problem with this lemma is the h:
 if it is smaller that the height of the tree the two operations behave differently*)
