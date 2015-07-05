@@ -309,20 +309,33 @@ module BTree = struct
 
     (* set of all entries contained in the subtree of the inode
     pointed by [r] in the store [s0] *)
-    val entry_set : forall 'p 'e 'k.
+    val entry_set_h : forall 'p 'e 'k.
       store 'p 'e 'k ->
       page_id 'p ->
+      nat ->
       set (entry 'e)
-    let rec entry_set s0 r = (
-      match Map.lookup r s0 with
-      | Nothing -> empty
-      | Just node -> (
-        match node with
-        | LNode(L(es)) -> Set.fromList es
-        | INode(I(_,qs)) -> (
-          let sets_of_entries = (List.map (entry_set s0) qs) in
-          (union_list_of_entry_set sets_of_entries)
-        )
+    let rec entry_set_h s0 r h= (
+      match h with
+      | 0 -> (
+         match Map.lookup r s0 with
+        | Nothing -> empty
+        | Just node -> (
+          match node with
+          | LNode(L(es)) -> Set.fromList es
+          | _ -> empty
+          end)
+      end)
+      | _ -> (
+        match Map.lookup r s0 with
+        | Nothing -> empty
+        | Just node -> (
+          match node with
+          | LNode(L(es)) -> Set.fromList es
+          | INode(I(_,qs)) -> (
+            let sets_of_entries = (List.map (fun q -> entry_set_h s0 q (h-1)) qs) in
+            (union_list_of_entry_set sets_of_entries)
+          )
+          end)
         end)
       end)
 
@@ -399,7 +412,7 @@ module BTree = struct
                   let qq i = nth_from_1 qs i in
                   let ss i = (
                     match qq i with
-                    | Just qi -> Just (entry_set s0 qi)
+                    | Just qi -> Just (entry_set_h s0 qi (h+1))
                     | _ -> Nothing
                     end)
                   in
@@ -421,7 +434,7 @@ module BTree = struct
                     List.all pred (from_to 1 n)
                   in
                   let union_clause =
-                    let union' = entry_set s0 r in
+                    let union' = entry_set_h s0 r h in
                     setEqual ss0 union'
                   in
                   let cond_sj = (
