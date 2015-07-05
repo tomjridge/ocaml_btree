@@ -12,12 +12,13 @@ begin
 termination wf_btree by lexicographic_order
 termination find_h by lexicographic_order
 termination from_to_h by lexicographic_order
+termination entry_set_h by lexicographic_order
 
 lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_btree e s c(( 0 :: nat)) \<longleftrightarrow> False))"
 by auto
 
 lemma first_returns_something_only_if [simp]:
-"\<forall> xs p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
+"\<forall> p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
 apply auto
 apply (simp add:first_def)
 
@@ -28,10 +29,27 @@ apply auto
 apply (simp add:first_def)
 apply (case_tac "find_indices p xs")
   apply auto
-  apply (case_tac xs)
+  apply (induct xs)
     apply auto
-    
+
+    apply (case_tac "p a")
+    apply auto
+done
+
+lemma abc [simp]:
+"\<forall> env e k. map_of (map (\<lambda>e. (entry_to_key env e, e)) (list_of_set (set list))) k =
+(case (first list (\<lambda>x. key_eq env k (entry_to_key env x))) of None \<Rightarrow> None | Some i \<Rightarrow> nth_from_1 list i)"
+apply auto
+apply (induct list)
+  (* list = [] *)
+  apply auto
+  apply (simp add:first_def)
+  apply (simp add:list_of_set_def)
+
+  
+
 oops
+
 lemma ab [simp]:
 "\<forall> a p lista. find_indices p list = a # lista \<longrightarrow> (
        case index list a of None \<Rightarrow> False | Some e \<Rightarrow> True)"
@@ -280,4 +298,5 @@ apply (case_tac h)
     apply (case_tac a)
       apply auto
 done
+
 end
