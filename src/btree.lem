@@ -219,22 +219,13 @@ module Fs_impl_types = struct
         free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
       |>
 
-    val key_eq : forall 'p 'e 'k.
-      env 'p 'e 'k ->
-      key 'k ->
-      key 'k ->
-      bool
-    let key_eq env k1 k2 =
-      not(env.key_lt k1 k2)
-      && not(env.key_lt k2 k1)
-
     val key_lte : forall 'p 'e 'k.
       env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
     let key_lte env k1 k2 =
-      env.key_lt k1 k2 || key_eq env k1 k2
+      env.key_lt k1 k2 || k1 = k2
 
     val entry_lt : forall 'p 'e 'k.
       env 'p 'e 'k ->
@@ -244,23 +235,13 @@ module Fs_impl_types = struct
     let entry_lt env e1 e2 =
       env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)
 
-    val entry_eq : forall 'p 'e 'k.
-      env 'p 'e 'k ->
-      entry 'e ->
-      entry 'e ->
-      bool
-    let entry_eq env e1 e2 =
-      (not (env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)))
-      &&
-        (not (env.key_lt (env.entry_to_key e2) (env.entry_to_key e1)))
-
     val entry_lte : forall 'p 'e 'k.
       env 'p 'e 'k ->
       entry 'e ->
       entry 'e ->
       bool
     let entry_lte env e1 e2 =
-      entry_lt env e1 e2 || entry_eq env e1 e2
+      entry_lt env e1 e2 || e1 = e2
 
 
     (* insertion types *)
@@ -294,46 +275,39 @@ module BTree = struct
           let s_e = index sorted_es i in
           let e = index es i in
           (match (s_e,e) with
-           | (Just s_e, Just e) -> entry_eq env s_e e
+           | (Just s_e, Just e) -> s_e = e
            | _ -> false (* coverage:impossible -- s_e and e lists have the same length, so index op will always find something *)
            end)
         in
         (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
 
-    val union_list_of_entry_set : forall 'e.
-      list (set (entry 'e)) ->
-      set (entry 'e)
-    let union_list_of_entry_set xs =
-      let f1 sofar acc = (union) sofar acc in
-      List.foldl f1 empty xs
-
-    (* set of all entries contained in the subtree of the inode
+    (* list of all entries contained in the subtree of the inode
     pointed by [r] in the store [s0] *)
-    val entry_set_h : forall 'p 'e 'k.
+    val entries_list_h : forall 'p 'e 'k.
       store 'p 'e 'k ->
       page_id 'p ->
       nat ->
-      set (entry 'e)
-    let rec entry_set_h s0 r h= (
+      list (entry 'e)
+    let rec entries_list_h s0 r h= (
       match h with
       | 0 -> (
          match Map.lookup r s0 with
-        | Nothing -> empty
+        | Nothing -> []
         | Just node -> (
           match node with
-          | LNode(L(es)) -> Set.fromList es
-          | _ -> empty
+          | LNode(L(es)) -> es
+          | _ -> []
           end)
       end)
       | _ -> (
         match Map.lookup r s0 with
-        | Nothing -> empty
+        | Nothing -> []
         | Just node -> (
           match node with
-          | LNode(L(es)) -> Set.fromList es
+          | LNode(L(es)) -> es
           | INode(I(_,qs)) -> (
-            let sets_of_entries = (List.map (fun q -> entry_set_h s0 q (h-1)) qs) in
-            (union_list_of_entry_set sets_of_entries)
+            let list_of_lists_of_entries = (List.map (fun q -> entries_list_h s0 q (h-1)) qs) in
+            List.concat list_of_lists_of_entries
           )
           end)
         end)
@@ -412,7 +386,7 @@ module BTree = struct
                   let qq i = nth_from_1 qs i in
                   let ss i = (
                     match qq i with
-                    | Just qi -> Just (entry_set_h s0 qi (h+1))
+                    | Just qi -> Just (fromList (entries_list_h s0 qi (h+1)))
                     | _ -> Nothing
                     end)
                   in
@@ -434,7 +408,7 @@ module BTree = struct
                     List.all pred (from_to 1 n)
                   in
                   let union_clause =
-                    let union' = entry_set_h s0 r h in
+                    let union' = fromList (entries_list_h s0 r h) in
                     setEqual ss0 union'
                   in
                   let cond_sj = (
@@ -553,7 +527,7 @@ module BTree = struct
             | _ -> List.length es + 1 (*the key is bigger than all the keys of the INode, so we give the index of the bigger page_id we have *)
             end)
           in
-          if test i es (fun x -> key_eq env (env.entry_to_key a) (env.entry_to_key x)) then
+          if test i es (fun x -> (env.entry_to_key a) = (env.entry_to_key x)) then
             (match replace(a,i,es) with
              | Just es' ->
                 let l' = LNode(L(es')) in
@@ -654,13 +628,13 @@ module BTree = struct
             | _ -> (Nothing,r,sg)
             end)
         | Just (LNode(L(es))) -> (
-          match (first es (fun x -> key_eq env k (env.entry_to_key x))) with
+          match (first es (fun x -> k = (env.entry_to_key x))) with
           | Just i -> (Just (F_Ret(r,i)),r,sg)
           | _ -> (Nothing,r,sg)
           end)
         | _ -> (Nothing,r,sg) (* page id does not exist in store *)
         end)
-      | (Just (F_Ret(r,i)),_,sg) -> (Nothing,r,sg) (* we do not allow "hand-made" F_Ret: the function using [find_trans] should catch the generated F_Ret before passing it again to find_trans *)
+      | (Just (F_Ret(r,_)),_,sg) -> (Nothing,r,sg) (* we do not allow "hand-made" F_Ret: the function using [find_trans] should catch the generated F_Ret before passing it again to find_trans *)
       | _ -> c0 end)
 
     val find_h : forall 'p 'e 'k.
@@ -718,7 +692,7 @@ module BTree = struct
             | _ -> Nothing
             end)
         | Just (LNode(L(es))) -> (
-            match first es (fun x -> key_eq env (env.entry_to_key x) (env.entry_to_key c)) with
+            match first es (fun x -> (env.entry_to_key x) = (env.entry_to_key c)) with
             | Nothing -> (* DLNoMatch *)
                Just(DUp,r,pp,sg)
             | Just i -> (
