@@ -40,19 +40,19 @@ apply auto
 
           apply (case_tac lnode)
           apply auto
-          apply (case_tac "first list (\<lambda>x. key_eq env k (entry_to_key env x))")
+          apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
           apply auto
           apply (simp add:first_def)
-          apply (case_tac "find_indices (\<lambda>x. key_eq env k (entry_to_key env x)) list")
+          apply (case_tac "find_indices (\<lambda>x. k = entry_to_key env x) list")
             apply auto
 done
 
 lemma find_entry_equal_to_map:
 "\<forall> env k c s r. 
 let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
-wf_btree env s (r, (entry_set_h s r h),n) h \<longrightarrow>
+wf_btree env s (r, set(entries_list_h s r h),n) h \<longrightarrow>
 find_entry (find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) (list_of_set(entry_set_h s r h))) k)"
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (entries_list_h s r h)) k)"
 apply (induction h rule:wf_btree.induct)
   (* h = 0 *)
   apply auto
@@ -74,10 +74,16 @@ apply (induction h rule:wf_btree.induct)
 
           apply (simp add:find_h_simps)
           apply (simp add:find_trans_def)
-          apply (case_tac "first list (\<lambda>x. key_eq env k (entry_to_key env x)) ")
+          apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
             apply (simp add:find_entry.simps)
-            apply auto
-            (*  first list (\<lambda>x. key_eq env k (entry_to_key env x)) and map k are equal? How? ? ? *)
+            
+            apply (simp add:find_entry.simps)
+            
+        
+  (* h = Suc *)
+  
+
+    
 oops
 
 end

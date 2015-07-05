@@ -12,7 +12,7 @@ begin
 termination wf_btree by lexicographic_order
 termination find_h by lexicographic_order
 termination from_to_h by lexicographic_order
-termination entry_set_h by lexicographic_order
+termination entries_list_h by lexicographic_order
 
 lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_btree e s c(( 0 :: nat)) \<longleftrightarrow> False))"
 by auto
@@ -36,21 +36,27 @@ apply (case_tac "find_indices p xs")
     apply auto
 done
 
-lemma abc [simp]:
-"\<forall> env e k. map_of (map (\<lambda>e. (entry_to_key env e, e)) (list_of_set (set list))) k =
-(case (first list (\<lambda>x. key_eq env k (entry_to_key env x))) of None \<Rightarrow> None | Some i \<Rightarrow> nth_from_1 list i)"
+lemma map_and_first_are_equal [simp]:
+"\<forall> k env.
+map_of (map (\<lambda>e. (entry_to_key env e, e)) list) k =
+(case first list (\<lambda>x. k = entry_to_key env x) of None \<Rightarrow> None | Some i \<Rightarrow> nth_from_1 list i)"
 apply auto
 apply (induct list)
   (* list = [] *)
-  apply auto
   apply (simp add:first_def)
-  apply (simp add:list_of_set_def)
 
+  (* list = a#list *)
+  apply (simp add:first_def)
+  apply auto
+    apply (simp add:nth_from_1_def)
   
+    apply (case_tac "map Suc (find_indices (\<lambda>x. k = entry_to_key env x) list)")
+      apply auto
 
-oops
+      apply (simp add:nth_from_1_def)
+done
 
-lemma ab [simp]:
+lemma find_indices_returns_an_existing_element [simp]:
 "\<forall> a p lista. find_indices p list = a # lista \<longrightarrow> (
        case index list a of None \<Rightarrow> False | Some e \<Rightarrow> True)"
 apply auto
@@ -98,7 +104,7 @@ apply (case_tac "a")
        
         apply (case_tac lnode)
         apply auto
-        apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
+        apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
           apply auto
 done
 
@@ -127,7 +133,7 @@ apply (case_tac c)
 
       apply (case_tac lnode)
       apply auto
-      apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
+      apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
         apply auto
 done        
 
@@ -138,7 +144,7 @@ find_trans env (Some(c),p,s0) = (Some(F_Ret(p,n)),p,s0) \<longrightarrow>
   Find k \<Rightarrow>
 ( case s0 p of
   Some(LNode(L(es))) \<Rightarrow>
-    (case  (first es (\<lambda> x .  key_eq env k ((entry_to_key   env) x))) of
+    (case  (first es (\<lambda> x . k = ((entry_to_key   env) x))) of
             Some i => i = n
           | _ => False)
   | _ \<Rightarrow> False)
@@ -162,7 +168,7 @@ apply (case_tac c)
 
       apply (case_tac lnode)
       apply auto
-      apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
+      apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
         apply auto
 done
 
@@ -243,7 +249,7 @@ apply (simp add:find_h.simps)
 
           apply (case_tac lnode)
           apply auto
-          apply (case_tac "first list (\<lambda>x. key_eq env key (entry_to_key env x))")
+          apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
             apply auto
 done
 
@@ -266,7 +272,7 @@ apply (induct h)
 
         apply (case_tac lnode)
         apply auto
-        apply (case_tac "first list (\<lambda>x. key_eq env k (entry_to_key env x))")
+        apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
           apply auto
 done
 
