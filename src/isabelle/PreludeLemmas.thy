@@ -17,6 +17,42 @@ termination entries_list_h by lexicographic_order
 lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_btree e s c(( 0 :: nat)) \<longleftrightarrow> False))"
 by auto
 
+declare entries_list_h.simps [simp del] 
+lemma entries_list_h_simps:
+"entries_list_h s0 r (Suc h) = (
+        (case   s0 r of
+          None \<Rightarrow> []
+        | Some node \<Rightarrow> (
+          (case  node of
+            LNode(L(es)) \<Rightarrow> es
+          | INode(I(_,qs)) \<Rightarrow> (
+            (let list_of_lists_of_entries = (List.map (\<lambda> q .  entries_list_h s0 q h)) qs in
+            List.concat list_of_lists_of_entries)
+          )
+          ))))"
+apply (simp add:entries_list_h.simps)
+apply (case_tac "s0 r")
+apply auto
+  apply (case_tac a)
+  apply (case_tac inode)
+  apply auto
+done
+
+lemma wf_btree_requires_qs_length_to_be_at_least_2_if_inodes_exist [simp]:
+"\<forall> env k c s r ds qs. 
+s r = Some(INode(I(ds,qs))) \<longrightarrow>
+(let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
+wf_btree env s (r, set(entries_list_h s r h),n) h \<longrightarrow> (Suc(length ds) = length qs) \<and> (length ds > 0) \<and> (length qs \<ge> 2))"
+apply (induct h rule:wf_btree.induct)
+  apply auto
+
+  apply (case_tac "Suc (length ds) = length qs")
+    apply auto
+
+apply (case_tac ds)
+  apply auto
+done
+
 lemma first_returns_something_only_if [simp]:
 "\<forall> p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
 apply auto
@@ -251,6 +287,13 @@ apply (simp add:find_h.simps)
           apply auto
           apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
             apply auto
+done
+
+lemma find_h_does_not_alter_store_if_wf_btree [simp]:
+"\<forall> env c0 p0 s0 opt s1.
+let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
+wf_btree env s (r, set(entries_list_h s0 p0 h),n) h \<longrightarrow> (find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
+apply auto
 done
 
 lemma find_h_always_return_page_id_in_store [simp]:

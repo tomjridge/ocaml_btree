@@ -10,11 +10,6 @@ imports
 
 begin
 
-lemma find_h_does_not_alter_wf_btree1:
-" (wf_btree env s0 (r,ss,n) h) \<and> find_h env (c0,r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0)"
-apply auto
-done
-
 lemma find_h_is_correct:
 "\<forall> env s r n k p i es. find_h env ((Some(Find k)),r,s) h = (Some(p,i),s) \<longrightarrow> (p \<in> dom s) 
 \<and> (case (s p) of (Some(LNode(L(es)))) \<Rightarrow> (case (nth_from_1 es i) of Some e \<Rightarrow> True(*(e \<in> set es) \<and> (k = (entry_to_key env e))*) | _ \<Rightarrow> False) | _ \<Rightarrow> False)"
@@ -46,8 +41,8 @@ apply auto
           apply (case_tac "find_indices (\<lambda>x. k = entry_to_key env x) list")
             apply auto
 done
-
-lemma find_entry_equal_to_map:
+          
+lemma find_entry_equal_to_map_lookup:
 "\<forall> env k c s r. 
 let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
 wf_btree env s (r, set(entries_list_h s r h),n) h \<longrightarrow>
@@ -64,7 +59,7 @@ apply (induction h rule:wf_btree.induct)
     (* s r = Some a *)
     apply (case_tac a)
       (* a = INode *)
-      apply auto
+      apply (simp add:entries_list_h.simps)
       
       (* a = LNode *)
       apply (case_tac lnode)
@@ -75,14 +70,50 @@ apply (induction h rule:wf_btree.induct)
           apply (simp add:find_h_simps)
           apply (simp add:find_trans_def)
           apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
-            apply (simp add:find_entry.simps)
+            apply (simp add:entries_list_h_simps find_entry.simps)
             
-            apply (simp add:find_entry.simps)
+            apply (simp add:entries_list_h_simps find_entry.simps)
             
         
   (* h = Suc *)
-  
+  apply (case_tac "s ra")
+    apply auto
 
+    (* s ra = Soma a*)
+    apply (case_tac a)
+      apply auto
+      
+      (* a = inode *)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "Suc (length a) = length b")
+        apply auto
+
+        apply (case_tac "a")
+          apply auto
+
+          apply (simp add:Let_def)
+          (* we start solving the easy conditions of wf_btree *)
+          apply (case_tac "nth_from_1 (aa # list) (length b - Suc 0)")
+            apply auto
+
+            apply (case_tac "nth_from_1 b (length b)")
+              apply auto
+
+              apply (case_tac "index b 0")
+                apply auto
+
+                apply (simp add:from_to_def)
+                apply (case_tac "length b - Suc 0")
+                  apply auto
+
+                  apply (case_tac "get_m s (b ! 0)")
+                    apply auto
+
+                    (* the inductive hypothesis is there: now we just need to solve the remaining conditions *)
+                    
+                      
+            
     
 oops
 
