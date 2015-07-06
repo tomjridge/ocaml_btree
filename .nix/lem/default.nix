@@ -6,7 +6,8 @@ let
     ocaml = pkgs.ocaml_4_02_1;
     git = pkgs.git;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
-    java = pkgs.jre; # from isabelle 
+#    java = pkgs.jre; # from isabelle 
+    zarith= pkgs.ocamlPackages_4_02_1.zarith;
     isabelle = import ./../isabelle { };
 in stdenv.mkDerivation {
     name = "lem";
@@ -17,13 +18,14 @@ in stdenv.mkDerivation {
       sha256 = "9f3669122d45f2afdc1bc0bb46cb7b168f4f139a4d3f5a9511f1df82e8e6d788";
     };
   
-    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl pkgs.ocamlPackages_4_02_1.zarith pkgs.gmp isabelle ]; # note that lem tries to build zarith as well; java
+    buildInputs = [ ocaml findlib git pkgs.pkgconfig pkgs.perl zarith pkgs.gmp isabelle ]; # note that lem tries to build zarith as well; java
   
     configurePhase = "true"; 	# Skip configure
     
     buildPhase = ''
       # export ISABELLE_JDK_HOME=${java}
       export LD_LIBRARY_PATH=`pwd`/ocaml-lib/dependencies/zarith:$LD_LIBRARY_PATH  # complete hack - need to find dllzarith.so
+      export ZARITH=
       echo 'let v="2739f6a"' >src/version.ml  # complete hack - the source code isn't a git repo after fetchgit
       echo "!!!"
       make
