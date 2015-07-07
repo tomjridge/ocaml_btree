@@ -53,6 +53,23 @@ apply (case_tac ds)
   apply auto
 done
 
+lemma if_find_indices_finds_index_then_the_element_exists [simp]:
+"\<forall> p n ns. find_indices p list = n # ns \<longrightarrow>
+       (\<exists> e . (index list n = Some e) \<and> e \<in> set list \<and> (p e = p (list ! n)) \<and> p e \<and>  p (list ! n)) \<and> n < length list "
+apply (induct list)
+  apply auto
+  
+  apply (case_tac "p a")
+    apply auto
+done
+
+lemma find_h_is_correct_helper [simp]:
+"\<forall> k env n ns .find_indices (\<lambda>x. k = entry_to_key env x) list = n # ns \<longrightarrow>
+       k = entry_to_key env (list ! n)"
+apply (induct list)
+  apply auto
+done
+
 lemma first_returns_something_only_if [simp]:
 "\<forall> p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
 apply auto
@@ -65,11 +82,6 @@ apply auto
 apply (simp add:first_def)
 apply (case_tac "find_indices p xs")
   apply auto
-  apply (induct xs)
-    apply auto
-
-    apply (case_tac "p a")
-    apply auto
 done
 
 lemma map_and_first_are_equal [simp]:
@@ -90,17 +102,6 @@ apply (induct list)
       apply auto
 
       apply (simp add:nth_from_1_def)
-done
-
-lemma find_indices_returns_an_existing_element [simp]:
-"\<forall> a p lista. find_indices p list = a # lista \<longrightarrow> (
-       case index list a of None \<Rightarrow> False | Some e \<Rightarrow> True)"
-apply auto
-apply (induct list)
-  apply auto
-  
-  apply (case_tac "p a")
-    apply auto
 done
 
 lemma nth_from_1_is_like_nth [simp]:
@@ -135,7 +136,7 @@ apply (case_tac "a")
         apply auto
         apply (case_tac inode)
         apply auto
-        apply (case_tac " nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length a + 1 | Some i \<Rightarrow> i)")
+        apply (case_tac " nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
        
         apply (case_tac lnode)
@@ -164,7 +165,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length a + 1 | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -199,7 +200,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length a + 1 | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -280,7 +281,7 @@ apply (simp add:find_h.simps)
           apply auto
           apply (case_tac inode)
           apply auto
-          apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length a + 1 | Some i \<Rightarrow> i)")
+          apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
             apply auto
 
           apply (case_tac lnode)
@@ -310,7 +311,7 @@ apply (induct h)
       apply (case_tac a)
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length aa + 1 | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
         apply (case_tac lnode)
@@ -347,5 +348,5 @@ apply (case_tac h)
     apply (case_tac a)
       apply auto
 done
-
+  
 end

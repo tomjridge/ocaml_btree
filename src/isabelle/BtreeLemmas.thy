@@ -10,9 +10,9 @@ imports
 
 begin
 
-lemma find_h_is_correct:
+lemma find_h_is_correct [simp]:
 "\<forall> env s r n k p i es. find_h env ((Some(Find k)),r,s) h = (Some(p,i),s) \<longrightarrow> (p \<in> dom s) 
-\<and> (case (s p) of (Some(LNode(L(es)))) \<Rightarrow> (case (nth_from_1 es i) of Some e \<Rightarrow> True(*(e \<in> set es) \<and> (k = (entry_to_key env e))*) | _ \<Rightarrow> False) | _ \<Rightarrow> False)"
+\<and> (case (s p) of (Some(LNode(L(es)))) \<Rightarrow> (case (nth_from_1 es i) of Some e \<Rightarrow> (e \<in> set es) \<and> (k = (entry_to_key env e)) | _ \<Rightarrow> False) | _ \<Rightarrow> False)"
 apply auto
   (* the page_id obtained by find is in the store *)
   apply (induct h)
@@ -30,7 +30,7 @@ apply auto
         apply auto
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first a (key_lt env k) of None \<Rightarrow> length a + 1 | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first a (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
           apply (case_tac lnode)
@@ -69,11 +69,11 @@ apply (induction h rule:wf_btree.induct)
 
           apply (simp add:find_h_simps)
           apply (simp add:find_trans_def)
-          apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
-            apply (simp add:entries_list_h_simps find_entry.simps)
-            
-            apply (simp add:entries_list_h_simps find_entry.simps)
-            
+          apply (simp add:entries_list_h.simps)
+            apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+              apply (simp add:find_entry.simps)
+
+              apply (simp add:find_entry.simps entries_list_h.simps)
         
   (* h = Suc *)
   apply (case_tac "s ra")
@@ -111,10 +111,27 @@ apply (induction h rule:wf_btree.induct)
                     apply auto
 
                     (* the inductive hypothesis is there: now we just need to solve the remaining conditions *)
-                    
                       
-            
-    
 oops
 
+lemma find_entry_equal_to_map_lookup1:
+"\<forall> env k c s r .
+find_entry (find_h env (Some(Find k),r,s) h) = 
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (entries_list_h s r h)) k)"
+apply (induct h)
+  apply (simp add:find_h.simps find_entry.simps entries_list_h.simps first_def)
+
+  apply (simp add:find_trans_def find_h_simps find_entry.simps)
+  apply auto
+  apply (case_tac "s r")
+    apply (simp add:find_entry.simps entries_list_h_simps first_def)
+
+    apply auto
+    (* here we have s r = a : the INode case is the most interesting *)
+    apply (case_tac a)
+      apply auto
+      apply (case_tac inode)
+      apply auto
+      
+oops
 end

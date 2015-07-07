@@ -290,15 +290,7 @@ module BTree = struct
       list (entry 'e)
     let rec entries_list_h s0 r h= (
       match h with
-      | 0 -> (
-         match Map.lookup r s0 with
-        | Nothing -> []
-        | Just node -> (
-          match node with
-          | LNode(L(es)) -> es
-          | _ -> []
-          end)
-      end)
+      | 0 -> []
       | _ -> (
         match Map.lookup r s0 with
         | Nothing -> []
@@ -386,7 +378,7 @@ module BTree = struct
                   let qq i = nth_from_1 qs i in
                   let ss i = (
                     match qq i with
-                    | Just qi -> Just (fromList (entries_list_h s0 qi (h+1)))
+                    | Just qi -> Just (fromList (entries_list_h s0 qi h_plus_one))
                     | _ -> Nothing
                     end)
                   in
@@ -408,7 +400,7 @@ module BTree = struct
                     List.all pred (from_to 1 n)
                   in
                   let union_clause =
-                    let union' = fromList (entries_list_h s0 r h) in
+                    let union' = fromList (entries_list_h s0 r h_plus_one) in
                     setEqual ss0 union'
                   in
                   let cond_sj = (
@@ -620,7 +612,7 @@ module BTree = struct
            let i = (
              match first ds (fun x -> env.key_lt k x) with
              | Just i -> i
-             | _ -> List.length ds + 1
+             | _ -> List.length ps
              end)
            in
            (match nth_from_1 ps i with
