@@ -6,7 +6,7 @@ let
     ocaml = pkgs.ocaml_4_02_1;
     git = pkgs.git;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
-#    java = pkgs.jre; # from isabelle 
+    java = pkgs.jre; # from isabelle 
     zarith= pkgs.ocamlPackages_4_02_1.zarith;
     isabelle = import ./../isabelle { };
 in stdenv.mkDerivation {
