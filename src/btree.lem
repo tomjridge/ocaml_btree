@@ -4,22 +4,6 @@ open import Pervasives Set_extra Assert_extra
 
 module Utility = struct
 
-    (* insertion sort taken from https://ocaml.org/learn/taste.html*)
-    let rec s_insert f elem l = (
-      match l with
-      | [] -> [elem]
-      | x :: l ->
-         if (f elem x)
-         then (elem :: x :: l)
-         else (x :: (s_insert f elem l))
-      end)
-
-    let rec sort f l = (
-      match l with
-      | [] -> []
-      | x :: l -> s_insert f x (sort f l)
-      end)
-
     (* nth_from_1 xs 1 is the first elt of xs - we count from 1 not 0 *)
     val nth_from_1 : forall 'a.
       list 'a ->
@@ -216,7 +200,7 @@ module Fs_impl_types = struct
         minN = 2;
         entry_to_key = (fun (Entry e) -> Key e);
         key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
-        free_page_id = (fun store -> match (sort (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
+        free_page_id = (fun store -> match (Sorting.insertSortBy (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
       |>
 
     val key_lte : forall 'p 'e 'k.
@@ -262,24 +246,6 @@ end
 module BTree = struct
     open Fs_impl_types
     open Utility
-
-    val sorted_entry_list : forall 'p 'e 'k.
-      env 'p 'e 'k ->
-      list (entry 'e) ->
-      bool
-    let sorted_entry_list env es =
-      if List.length es = 0 then true
-      else
-        let f1 i =
-          let sorted_es = sort (entry_lt env) es in
-          let s_e = index sorted_es i in
-          let e = index es i in
-          (match (s_e,e) with
-           | (Just s_e, Just e) -> s_e = e
-           | _ -> false (* coverage:impossible -- s_e and e lists have the same length, so index op will always find something *)
-           end)
-        in
-        (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
 
     (* list of all entries contained in the subtree of the inode
     pointed by [r] in the store [s0] *)
@@ -347,7 +313,7 @@ module BTree = struct
                 let ss' = Set.fromList es in
                 match setEqual ss0 ss' with
                 | false -> false
-                | true -> (sorted_entry_list env es)
+                | true -> (Sorting.isSortedBy (entry_lt env) es)
                 end)
               end)
             end)
