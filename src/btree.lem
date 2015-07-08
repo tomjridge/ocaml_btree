@@ -1,4 +1,4 @@
-open import Pervasives Set_extra Assert_extra
+open import Pervasives Set_extra Assert_extra Sorting Maybe_extra
 
 (* Note: this btree data structure requires maxN >= 3*)
 
@@ -281,6 +281,13 @@ module BTree = struct
         in
         (foldl (fun acc i -> f1 i && acc) true (from_to 0 ((List.length es)-1)))
 
+    val sorted_entry_list_2 : forall 'p 'e 'k.
+      env 'p 'e 'k ->
+      list (entry 'e) ->
+      bool
+    let sorted_entry_list2 env es = (isSortedBy env.key_lt es)
+
+
     (* list of all entries contained in the subtree of the inode
     pointed by [r] in the store [s0] *)
     val entries_list_h : forall 'p 'e 'k.
@@ -304,6 +311,44 @@ module BTree = struct
           end)
         end)
       end)
+
+
+
+    (* list of all entries contained in the subtree of the inode
+    pointed by [r] in the store [s0] *)
+    val entries_list_h_2 : forall 'p 'e 'k.
+      store 'p 'e 'k ->
+      page_id 'p ->
+      nat ->
+      maybe (list (entry 'e))
+    let rec entries_list_h_2 s0 r h= (
+      match h with
+      | 0 -> Nothing
+      | 1 -> (
+        match Map.lookup r s0 with
+        | Nothing -> Nothing
+        | Just node -> (
+          match node with
+          | LNode(L(es)) -> Just(es)
+          | INode(I(_,qs)) -> Nothing
+          end) end)
+      | _ -> (
+        match Map.lookup r s0 with
+        | Nothing -> Nothing
+        | Just node -> (
+          match node with
+          | LNode(L(es)) -> Nothing
+          | INode(I(_,qs)) -> (
+            let list_of_lists_of_entries = (List.map (fun q -> entries_list_h_2 s0 q (h-1)) qs) in
+            if List.all isJust list_of_lists_of_entries then 
+              Just(List.concat (List.map fromJust list_of_lists_of_entries))
+            else 
+              Nothing
+          )
+          end)
+        end)
+      end)
+
 
     (* [get_m] returns the size of the node pointed by [r] in [s0] *)
     val get_m: forall 'p 'k 'e.
