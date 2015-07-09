@@ -25,7 +25,7 @@ in stdenv.mkDerivation {
     buildPhase = ''
       # export ISABELLE_JDK_HOME=${java}
       export LD_LIBRARY_PATH=`pwd`/ocaml-lib/dependencies/zarith:$LD_LIBRARY_PATH  # complete hack - need to find dllzarith.so
-      export ZARITH=
+      # export ZARITH=
       echo 'let v="2739f6a"' >src/version.ml  # complete hack - the source code isn't a git repo after fetchgit
       echo "!!!"
       make
