@@ -45,9 +45,10 @@ done
 lemma find_entry_equal_to_map_lookup:
 "\<forall> env k c s r. 
 let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
-wf_btree env s (r, set(entries_list_h s r h),n) h \<longrightarrow>
+ let all_entries = (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
+wf_btree env s (r, set all_entries,n) h \<longrightarrow>
 find_entry (find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) (entries_list_h s r h)) k)"
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
 apply (induction h rule:wf_btree.induct)
   (* h = 0 *)
   apply auto
@@ -116,22 +117,16 @@ oops
 
 lemma find_entry_equal_to_map_lookup1:
 "\<forall> env k c s r .
+let all_entries = (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
 find_entry (find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) (entries_list_h s r h)) k)"
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
 apply (induct h)
   apply (simp add:find_h.simps find_entry.simps entries_list_h.simps first_def)
 
   apply (simp add:find_trans_def find_h_simps find_entry.simps)
   apply auto
   apply (case_tac "s r")
-    apply (simp add:find_entry.simps entries_list_h_simps first_def)
 
-    apply auto
-    (* here we have s r = a : the INode case is the most interesting *)
-    apply (case_tac a)
-      apply auto
-      apply (case_tac inode)
-      apply auto
       
 oops
 end
