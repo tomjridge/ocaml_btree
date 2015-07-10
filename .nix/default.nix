@@ -7,8 +7,7 @@ let
     isabelle = import ./isabelle { };
     ocaml = pkgs.ocaml_4_02_1;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
-    camlp4 = pkgs.ocamlPackages_4_02_1.camlp4;
-    #bisect = import ./bisect { };
+    bisect = import ./bisect { };
     lem = import ./lem { };
 in stdenv.mkDerivation {
     name = "lemenv";
@@ -17,7 +16,7 @@ in stdenv.mkDerivation {
     isabelle = isabelle;
 
     src = lem;
-    buildInputs = [ perl isabelle lem ocaml findlib camlp4 bisect];
+    buildInputs = [ perl isabelle lem ocaml findlib bisect];
 
     configurePhase = "true"; 	# Skip configure
 
@@ -33,7 +32,7 @@ in stdenv.mkDerivation {
       '';
 
 # eval "${!curPhase:-$curPhase}" from nix-shell
-  
+
     installPhase = "true"; # don't want to install
 
 
