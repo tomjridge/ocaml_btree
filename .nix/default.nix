@@ -16,6 +16,7 @@ in stdenv.mkDerivation {
     lem = lem;
     isabelle = isabelle;
 
+    gmpLibPath = stdenv.lib.makeLibraryPath [ pkgs.gmp5 ];
     src = lem;
     buildInputs = [ perl isabelle lem ocaml findlib bisect zarith];
 
@@ -38,6 +39,7 @@ in stdenv.mkDerivation {
 
 
 shellHook = ''
+    export LD_LIBRARY_PATH=$gmpLibPath #this permits the dynamic binding of libgmp.so.10.so
     export LEMPATH=${lem}/lem
     export PATH=$PATH:${lem}/lem
     export LEMLIB=${lem}/lem/library

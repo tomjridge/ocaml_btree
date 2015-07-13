@@ -6,7 +6,7 @@ let
     perl = pkgs.perl;
     ocaml = pkgs.ocaml_4_02_1;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
-    gmp = pkgs.gmp;
+    gmp = pkgs.gmp5;
 in stdenv.mkDerivation {
     name = "ocaml_zarith";
 
@@ -18,6 +18,5 @@ in stdenv.mkDerivation {
     buildInputs = [ ocaml findlib pkgs.which perl gmp];
     dontAddPrefix = true;
     createFindlibDestdir = true;
-
 
 }
