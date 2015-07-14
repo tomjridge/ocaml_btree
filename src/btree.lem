@@ -250,39 +250,49 @@ module BTree = struct
 
     (* list of all entries contained in the subtree of the inode
     pointed by [r] in the store [s0] *)
-    val entries_list_h : forall 'p 'e 'k.
+    val norm_entries_list_h : forall 'p 'e 'k.
       store 'p 'e 'k ->
       page_id 'p ->
       nat ->
       maybe (list (entry 'e))
-    let rec entries_list_h s0 r h= (
+    let rec norm_entries_list_h s0 r h= (
       match h with
-      | 0 -> Nothing
-      | 1 -> (
+      | 0 -> (
         match Map.lookup r s0 with
-        | Nothing -> Nothing
         | Just node -> (
           match node with
           | LNode(L(es)) -> Just(es)
           | INode(I(_,_)) -> Nothing
-          end) end)
+          end)
+        | _ -> Nothing
+        end)
       | _ -> (
         match Map.lookup r s0 with
-        | Nothing -> Nothing
         | Just node -> (
           match node with
-          | LNode(L(_)) -> Nothing
+          | LNode _ -> Nothing
           | INode(I(_,qs)) -> (
-            let list_of_lists_of_entries = (List.map (fun q -> entries_list_h s0 q (h-1)) qs) in
+            let list_of_lists_of_entries = (List.map (fun q -> norm_entries_list_h s0 q (h-1)) qs) in
             if List.all isJust list_of_lists_of_entries then
               Just(List.concat (List.map fromJust list_of_lists_of_entries))
             else
               Nothing
           )
           end)
+        | _ -> Nothing
         end)
       end)
 
+    val entries_list_h : forall 'p 'e 'k.
+      store 'p 'e 'k ->
+      page_id 'p ->
+      nat ->
+      maybe (list (entry 'e))
+    let rec entries_list_h s0 r h = (
+      match h with
+      | 0 -> Nothing
+      | _ -> norm_entries_list_h s0 r (h-1)
+      end)
 
     (* [get_m] returns the size of the node pointed by [r] in [s0] *)
     val get_m: forall 'p 'k 'e.
@@ -303,15 +313,14 @@ module BTree = struct
     (* Well formedness *)
 
     (* [wf_btree] defines the invariants of a btree *)
-    val wf_btree : forall 'p 'k 'e.
+    val norm_wf_btree : forall 'p 'k 'e.
       env 'p 'e 'k ->
       store 'p 'e 'k ->
       (page_id 'p * set (entry 'e) * nat) ->
       nat ->
       bool
-    let rec wf_btree env s0 (r,ss0,n0) h = (match h with
-        | 0 -> false
-        | 1 -> (
+    let rec norm_wf_btree env s0 (r,ss0,n0) h = (match h with
+        | 0 -> (
           match Map.lookup r s0 with
           | Nothing -> false
           | Just node -> (
@@ -358,7 +367,7 @@ module BTree = struct
                   let ss i = (
                     match qq i with
                     | Just qi -> (
-                      match entries_list_h s0 qi h with
+                      match norm_entries_list_h s0 qi h with
                       | Just list -> Just (fromList (list))
                       | _ -> Nothing
                       end)
@@ -376,14 +385,14 @@ module BTree = struct
                     let pred i =
                       let c = (qq i, ss i, mm i) in
                       (match c with
-                      | (Just qi, Just si, Just mi) -> (wf_btree env s0 (qi,si,mi) h)
+                      | (Just qi, Just si, Just mi) -> (norm_wf_btree env s0 (qi,si,mi) h)
                       | _ -> false
                        end)
                     in
                     List.all pred (from_to 1 n)
                   in
                   let union_clause = (
-                    match entries_list_h s0 r h_plus_one with
+                    match norm_entries_list_h s0 r h_plus_one with
                     | Just list -> setEqual ss0 (fromList list)
                     | _ -> false
                     end)
@@ -440,6 +449,19 @@ module BTree = struct
             end)
           end)
                                             end)
+
+    (* [wf_btree] defines the invariants of a btree *)
+    val wf_btree : forall 'p 'k 'e.
+      env 'p 'e 'k ->
+      store 'p 'e 'k ->
+      (page_id 'p * set (entry 'e) * nat) ->
+      nat ->
+      bool
+    let wf_btree env s0 c h =
+      (match h with
+       | 0 -> false
+       | _ -> norm_wf_btree env s0 c (h-1)
+       end)
 
     (* section 3: insertion as abstract machine rules *)
 
@@ -614,15 +636,15 @@ module BTree = struct
       | (Just (F_Ret(r,_)),_,sg) -> (Nothing,r,sg) (* we do not allow "hand-made" F_Ret: the function using [find_trans] should catch the generated F_Ret before passing it again to find_trans *)
       | _ -> c0 end)
 
-    val find_h : forall 'p 'e 'k.
+    val norm_find_h : forall 'p 'e 'k.
        env 'p 'e 'k ->
        find_config 'p 'e 'k ->
        nat ->
        (maybe (page_id 'p * nat) * store 'p 'e 'k)
-    let rec find_h env c h = (
+    let rec norm_find_h env c h = (
       match h with
       | 0 -> (
-        match c with
+        match find_trans env c with
         | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
         | (_,_,s0) -> (Nothing,s0)
         end)
@@ -631,8 +653,19 @@ module BTree = struct
         | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
         | (_,_,_) ->
            let c' = find_trans env c in
-           find_h env c' (h-1)
+           norm_find_h env c' (h-1)
         end)
+      end)
+
+    val find_h : forall 'p 'e 'k.
+       env 'p 'e 'k ->
+       find_config 'p 'e 'k ->
+       nat ->
+       (maybe (page_id 'p * nat) * store 'p 'e 'k)
+    let find_h env c h = (
+      match h with
+      | 0 -> let (_,_,s0) = c in (Nothing, s0)
+      | _ -> norm_find_h env c (h-1)
       end)
 
     val find_entry : forall 'p 'e 'k.
