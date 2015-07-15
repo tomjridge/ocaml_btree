@@ -650,7 +650,7 @@ module BTree = struct
         end)
       | _ -> (
         match c with
-        | (Just(F_Ret(p,n)),_,s0) -> (Just(p,n),s0)
+        | (Just(F_Ret _),_,s0) -> (Nothing,s0)
         | (_,_,_) ->
            let c' = find_trans env c in
            norm_find_h env c' (h-1)

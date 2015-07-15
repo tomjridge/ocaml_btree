@@ -9,13 +9,14 @@ imports
 
 begin
 
-termination wf_btree by lexicographic_order
-termination find_h by lexicographic_order
+termination norm_wf_btree by lexicographic_order
+termination norm_find_h by lexicographic_order
 termination from_to_h by lexicographic_order
-termination entries_list_h by lexicographic_order
+termination norm_entries_list_h by lexicographic_order
 
 lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_btree e s c(( 0 :: nat)) \<longleftrightarrow> False))"
-by auto
+apply (simp add:wf_btree_def)
+done
 
 declare entries_list_h.simps [simp del] 
 
@@ -25,15 +26,17 @@ s r = Some(INode(I(ds,qs))) \<longrightarrow>
 (let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
  let all_entries = (case (entries_list_h s r h) of (Some list) \<Rightarrow> set list | None \<Rightarrow> {}) in
 wf_btree env s (r, all_entries,n) h \<longrightarrow> (Suc(length ds) = length qs) \<and> (length ds > 0) \<and> (length qs \<ge> 2))"
-apply (induct h rule:wf_btree.induct)
+apply (simp add:wf_btree_def)
+apply (induct h rule:norm_wf_btree.induct)
+  apply simp
+  
   apply auto
-
   apply (case_tac "Suc (length ds) = length qs")
     apply auto
 
 apply (case_tac ds)
   apply auto
-done
+oops
 
 lemma if_find_indices_finds_index_then_the_element_exists [simp]:
 "\<forall> p n ns. find_indices p list = n # ns \<longrightarrow>
@@ -191,85 +194,135 @@ apply (case_tac c)
         apply auto
 done
 
-declare find_h.simps [simp del] 
+declare norm_find_h.simps [simp del] 
 
-lemma find_h_simps: "
-find_h env c (Suc h) = ( (
+lemma norm_find_h_simps: "
+\<forall> env c .
+norm_find_h env c (Suc h) = ( (
         (case  c of
-          ((Some(F_Ret(p,n)),_,s0)) => (Some(p,n),s0)
+          ((Some(F_Ret(p,n)),_,s0)) => (None, s0)
         | (_,_,s0) =>
            (let c' = (find_trans env c) in
-           find_h env c' ((Suc h)-(1::nat)))
+           norm_find_h env c' h)
         )))
 "
-  apply(simp add:find_h.simps )
+  apply auto
+  apply (case_tac h)
+    apply (simp add:norm_find_h.simps)
+    apply (case_tac a)
+      apply auto
+
+      apply (case_tac ab)
+        apply auto
+
+    apply (case_tac a)
+      apply (simp add:norm_find_h.simps)
+    apply auto
+    apply (case_tac ab)
+      apply auto
+      apply (simp_all add:Let_def norm_find_h.simps)
 done
 
-lemma find_h_simps2:
+lemma find_h_simps:
+"
+\<forall> env c .
+find_h env c (Suc (Suc h)) = ( (
+        (case  c of
+          ((Some(F_Ret(p,n)),_,s0)) => (None, s0)
+        | (_,_,s0) =>
+           (let c' = (find_trans env c) in
+           norm_find_h env c' h)
+        )))
+"
+apply (simp add:find_h_def norm_find_h_simps Let_def)
+done
+
+lemma norm_find_h_simps2:
 "\<forall> env k ra s va p i. (find_h env (Some (Find k), ra, s) (Suc (Suc va)) = (Some (p, i), s)) = 
 (find_h env (find_trans env (Some (Find k), ra, s)) (Suc va) = (Some (p, i), s))"
-apply auto
-  apply(simp add:find_h_simps Let_def)
+apply(simp_all add:find_h_def norm_find_h_simps Let_def)
+done
 
-  apply(simp add:find_h_simps )
+lemma norm_find_h_None_is_None [simp]:
+"\<forall> env p s . norm_find_h env (None,p,s) h = (None,s)"
+apply (induct h)
+  apply (simp add:norm_find_h.simps)
+
+  apply (simp add: norm_find_h_simps)
 done
 
 lemma find_h_None_is_None [simp]:
 "\<forall> env p s . find_h env (None,p,s) h = (None,s)"
-apply auto
-apply (induct h)
-  apply (simp add:find_h.simps)
-
-  apply (simp add:find_h_simps)
+apply (simp add:find_h_def)
+apply (case_tac h)
+  apply auto
 done
 
-lemma find_h_of_F_Ret_is_Some [simp]:
-"\<forall> env p i s . find_h env ((Some(F_Ret (p,i))),p,s) h = (Some(p,i),s)"
-apply (induct h)
-  (*h = 0*)
-  apply (simp add:find_h.simps)
-
-  (*h = Suc*)
-  apply (simp add:find_h_simps)
-done
-
-lemma find_h_does_not_alter_store [simp]:
-"\<forall> env c0 p0 s0 opt s1. (find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
+lemma norm_find_h_does_not_alter_store [simp]:
+"\<forall> env c0 p0 s0 opt s1. (norm_find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
 apply auto
 apply (induct h)
-apply (simp add:find_h.simps)
-  apply auto
-  apply (case_tac c0)
-    apply auto
-      
-      apply (case_tac a)
-        apply auto
-
-  apply (simp add:find_h_simps)
-  apply auto
+  apply (simp add:norm_find_h.simps find_trans_def)
   apply (case_tac c0)
     (* c0 = None *)
     apply auto
-    
+
     (* c0 = Some a *)
     apply (case_tac a)
-      apply auto
-
-      apply (simp add:find_trans_def)
+      (* a = Find k *)
       apply (case_tac "s0 p0")
         apply auto
 
-        apply (case_tac a)
-          apply auto
+        apply (case_tac aa)
           apply (case_tac inode)
           apply auto
-          apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
-            apply auto
+          apply (case_tac "first a (key_lt env key)")
+            apply (simp add:nth_from_1_def)
+            apply (case_tac b)
+              apply auto
+              
+              apply (case_tac "nth_from_1 b aa")
+              apply auto
 
           apply (case_tac lnode)
           apply auto
           apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
             apply auto
+
+      (* a = F_Ret *)
+      apply (simp add:norm_find_h_simps find_trans_def)
+      apply (case_tac c0)
+        apply auto
+
+        apply (case_tac a)
+          apply auto
+          
+          apply (simp add:find_trans_def)
+          apply (case_tac "s0 p0")
+            apply auto
+
+            apply (case_tac a)
+              apply (case_tac inode)
+              apply auto
+              apply (case_tac "first aa (key_lt env key)")
+              apply (simp add:nth_from_1_def)
+              apply (case_tac b)
+                apply auto
+          
+                apply (case_tac "nth_from_1 b a")
+                apply auto
+
+          apply (case_tac lnode)
+          apply auto
+          apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
+            apply auto                
+done
+
+lemma find_h_does_not_alter_store [simp]:
+"\<forall> env c0 p0 s0 opt s1. (find_h env (c0,p0,s0) h = (opt,s1)) \<longrightarrow> (s1=s0)"
+apply (simp add:find_h_def)
+  apply (case_tac h)
+    apply auto
 done
 
 lemma find_h_does_not_alter_store_if_wf_btree [simp]:
@@ -280,15 +333,12 @@ wf_btree env s (r, all_entries,n) h \<longrightarrow> (find_h env (c0,p0,s0) h =
 apply auto
 done
 
-lemma find_h_always_return_page_id_in_store [simp]:
-"\<forall> env k r s0 s i p. find_h env ((Some(Find k)),r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0) \<and> (p \<in> dom s)"
+lemma norm_find_h_always_return_page_id_in_store [simp]:
+"\<forall> env k r s0 s i p. norm_find_h env ((Some(Find k)),r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0) \<and> (p \<in> dom s)"
 apply auto
 apply (induct h)
-  apply (simp add:find_h.simps)
-
-  apply (simp add:find_h_simps)
-  apply (simp add:find_trans_def)
-    apply (case_tac "s0 r")
+  apply (simp add:norm_find_h.simps find_trans_def)
+  apply (case_tac "s0 r")
       apply auto
 
       apply (case_tac a)
@@ -301,35 +351,236 @@ apply (induct h)
         apply auto
         apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
           apply auto
+
+  apply (simp add:norm_find_h_simps find_trans_def)
+  apply (case_tac "s0 r")
+      apply auto
+
+      apply (case_tac a)
+        apply (case_tac inode)
+        apply auto
+        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+          apply auto
+
+        apply (case_tac lnode)
+        apply auto
+        apply (simp add:norm_find_h.simps)
+          apply (case_tac h)
+            apply auto
+            apply (simp add:find_trans_def)
+              apply (case_tac "s0 r")
+                apply auto
+
+                apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+                  apply auto
+                  
+        apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+          apply auto
 done
 
-lemma find_h_returns_some_only_if [simp]:
-"\<forall> env c r s p i. find_h env (c,r,s) h = (Some(p,i),s) \<longrightarrow>
+lemma find_h_always_return_page_id_in_store [simp]:
+"\<forall> env k r s0 s i p. find_h env ((Some(Find k)),r,s0) h = (Some(p,i),s) \<longrightarrow> (s = s0) \<and> (p \<in> dom s)"
+apply (simp add:find_h_def)
+apply (case_tac h)
+  apply auto
+done
+
+lemma norm_find_h_returns_some_only_if [simp]:
+"\<forall> env c r s p i k. norm_find_h env (c,r,s) h = (Some(p,i),s) \<longrightarrow>
 (
-  (h = 0 \<and> (c = (Some(F_Ret(p,i))))) 
+  (h = 0 \<and> (find_trans env (c,r,s) = (Some (F_Ret(p,i)),p,s))) 
 \<or>
-  (h > 0 \<and> c = (Some(F_Ret(p,i))))
-\<or>
-  (\<exists> c'. c' = find_trans env (c,r,s) \<and> find_h env c' (h-(1::nat)) = (Some(p,i),s) )
+  (h > 0 \<and> (\<exists> c'. c' = find_trans env (c,r,s) \<and> norm_find_h env c' (h-(1::nat)) = (Some(p,i),s)) )
 )
 "
 apply (case_tac h)
   apply auto
-  apply (simp add:find_trans_def Let_def)
+  apply (simp add:norm_find_h.simps find_trans_def)
   apply (case_tac c)
     apply auto
 
-    apply (simp add:find_h.simps)
     apply (case_tac a)
       apply auto
+      apply (case_tac "s r")
+        apply auto
 
-   apply (simp add:find_h_simps)
-   apply auto
-   apply (case_tac c)
+        apply (case_tac a)
+          apply (case_tac inode)
+          apply auto
+          apply (case_tac "first aa (key_lt env key)")
+            apply (case_tac b)
+              apply auto
+
+              apply (case_tac "nth_from_1 b a")
+              apply auto
+
+         apply (case_tac lnode)
+          apply (case_tac "first list (\<lambda>x. key = entry_to_key env x)")
+            apply auto
+
+  apply (simp add:norm_find_h_simps find_trans_def)
+  apply (case_tac c)
     apply auto
 
     apply (case_tac a)
       apply auto
+      apply (case_tac "s r")
+        apply (simp_all add:find_trans_def)
 done
-  
+
+lemma norm_find_h_is_correct [simp]:
+"\<forall> env s r n k p i es. norm_find_h env ((Some(Find k)),r,s) h = (Some(p,i),s) \<longrightarrow> (p \<in> dom s) 
+\<and> (case (s p) of (Some(LNode(L(es)))) \<Rightarrow> (case (nth_from_1 es i) of Some e \<Rightarrow> (e \<in> set es) \<and> (k = (entry_to_key env e)) | _ \<Rightarrow> False) | _ \<Rightarrow> False)"
+apply auto
+apply (induct h)
+  (*h = 0 *)
+  apply (simp add:norm_find_h.simps find_trans_def)
+  apply (case_tac "s r")
+    apply auto
+
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "first aa (key_lt env k)")
+            apply (case_tac b)
+              apply auto
+
+              apply (case_tac "nth_from_1 b a")
+              apply auto
+
+      apply (case_tac lnode)
+      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+        apply auto
+
+        apply (simp add:first_def)
+        apply (case_tac "find_indices (\<lambda>x. k = entry_to_key env x) list")
+          apply auto
+
+    (*h = 0 *)
+  apply (simp add:norm_find_h_simps find_trans_def)
+  apply (case_tac "s r")
+    apply auto
+
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "first aa (key_lt env k)")
+            apply (case_tac b)
+              apply auto
+
+              apply (case_tac "nth_from_1 b a")
+              apply auto
+
+      apply (case_tac lnode)
+      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+        apply auto
+
+        apply (simp add:norm_find_h.simps)
+          apply (case_tac h)
+            apply auto
+            apply (simp add:find_trans_def)
+done
+
+declare norm_entries_list_h.simps [simp del]
+lemma norm_entries_list_h_simps:
+"\<forall> s0 r. norm_entries_list_h s0 r (Suc h) =
+(case   s0 r of
+          Some node \<Rightarrow> (
+          (case  node of
+            LNode _ => None
+          | INode(I(_,qs)) => (
+            (let list_of_lists_of_entries = (List.map (\<lambda> q .  norm_entries_list_h s0 q h) qs) in
+            if ((\<forall> x \<in> (set list_of_lists_of_entries).  \<not> (x = None))) then
+              Some(List.concat (List.map the list_of_lists_of_entries))
+            else
+              None)
+          )))
+          | _ \<Rightarrow> None)
+"
+apply auto
+apply (simp add:norm_entries_list_h.simps)
+apply (case_tac "s0 r")
+  apply auto
+
+  apply (case_tac a)
+    apply (case_tac inode)
+    apply auto
+done
+
+lemma norm_find_entry_equal_to_map_lookup [simp]:
+"\<forall> env k c s r .
+let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
+find_entry (norm_find_h env (Some(Find k),r,s) h) = 
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
+apply (simp add:Let_def)
+apply (induct h)
+  apply auto
+  apply (simp add:norm_find_h.simps find_trans_def)
+  apply (case_tac "s r")
+    apply (simp add:find_entry.simps)
+    apply (simp add:norm_entries_list_h.simps first_def)
+    
+    apply (case_tac a)
+      apply (case_tac inode)
+        apply auto
+        apply (case_tac "first aa (key_lt env k)")
+          apply auto
+          apply (case_tac b)
+            apply (simp add:find_entry.simps)
+            apply (simp add:norm_entries_list_h.simps first_def)
+            
+            apply (case_tac "nth_from_1 b (length b)")
+              apply auto
+
+              apply (simp add:find_entry.simps)
+              apply (simp add:norm_entries_list_h.simps first_def)
+            
+            apply (case_tac "nth_from_1 b a")
+              apply (simp add:find_entry.simps)
+              apply (simp add:norm_entries_list_h.simps first_def)
+
+              apply auto
+              apply (simp add:find_entry.simps)
+              apply (simp add:norm_entries_list_h.simps first_def)
+
+
+      apply (case_tac lnode)
+      apply auto
+      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+        apply (simp add:find_entry.simps)
+        apply (simp add:norm_entries_list_h.simps)
+
+        apply (simp add:find_entry.simps)
+        apply (simp add:norm_entries_list_h.simps)
+
+  apply (simp add:norm_find_h_simps find_trans_def)
+  apply (case_tac "s r")
+    apply (simp add:find_entry.simps)
+    apply (simp add:norm_entries_list_h.simps first_def)
+    
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "first aa (key_lt env k)")
+        apply auto
+        apply (case_tac b)
+          apply (simp add:find_entry.simps)
+          apply (simp add:norm_entries_list_h_simps first_def)
+          apply auto
+    
+(* THIS IS THE LNODE CASE, uncomment after INODE CASE is solved
+      apply (case_tac lnode)
+      apply auto
+      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+        apply (simp add:find_entry.simps)
+        apply (simp add:norm_entries_list_h_simps first_def)
+
+        apply (case_tac nat)
+          apply (simp add:norm_find_h.simps find_trans_def find_entry.simps)
+          apply (simp add:norm_entries_list_h.simps first_def)
+
+          apply (simp add:norm_find_h_simps find_trans_def find_entry.simps)
+          apply (simp add:norm_entries_list_h.simps first_def)
+*)          
+oops
 end
