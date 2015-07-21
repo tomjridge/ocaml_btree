@@ -27,7 +27,7 @@ apply (case_tac h)
 apply (simp add:find_h_def find_entry.simps entries_list_h.simps first_def)
 
 
-apply (simp add:find_h_def  entries_list_h.simps del:map_and_first_are_equal)
+apply (simp add:find_h_def  entries_list_h.simps)
 done
 
 end

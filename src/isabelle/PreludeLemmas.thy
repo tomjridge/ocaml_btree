@@ -18,8 +18,6 @@ lemma btree_height_0_is_not_wf: " ((\<forall> e. \<forall> s. \<forall> c.  wf_b
 apply (simp add:wf_btree_def)
 done
 
-declare entries_list_h.simps [simp del] 
-
 lemma wf_btree_requires_qs_length_to_be_at_least_2_if_inodes_exist [simp]:
 "\<forall> env k c s r ds qs. 
 s r = Some(INode(I(ds,qs))) \<longrightarrow>
@@ -67,26 +65,6 @@ apply auto
 apply (simp add:first_def)
 apply (case_tac "find_indices p xs")
   apply auto
-done
-
-lemma map_and_first_are_equal [simp]:
-"\<forall> k env.
-map_of (map (\<lambda>e. (entry_to_key env e, e)) list) k =
-(case first list (\<lambda>x. k = entry_to_key env x) of None \<Rightarrow> None | Some i \<Rightarrow> nth_from_1 list i)"
-apply auto
-apply (induct list)
-  (* list = [] *)
-  apply (simp add:first_def)
-
-  (* list = a#list *)
-  apply (simp add:first_def)
-  apply auto
-    apply (simp add:nth_from_1_def)
-  
-    apply (case_tac "map Suc (find_indices (\<lambda>x. k = entry_to_key env x) list)")
-      apply auto
-
-      apply (simp add:nth_from_1_def)
 done
 
 lemma nth_from_1_is_like_nth [simp]:
@@ -507,12 +485,181 @@ apply (case_tac "s0 r")
     apply auto
 done
 
+lemma norm_entries_list_returns_None_if [simp]:
+"\<forall> ds qs s r. norm_entries_list_h s r h = None \<longrightarrow>
+(s r = None)
+\<or>
+(h = 0 \<and> (case s r of Some(LNode(_)) \<Rightarrow> False | _ \<Rightarrow> True))
+\<or>
+((h > 0) \<and> (case s r of Some(INode(I(_,qs))) \<Rightarrow> (\<exists> q \<in> set qs. (norm_entries_list_h s q (h-(1::nat)) = None)) | _ \<Rightarrow> True))
+"
+apply (case_tac h)
+  apply (simp add:norm_entries_list_h.simps)
+  apply auto
+  apply (case_tac "s r")
+    apply auto
+
+    apply (case_tac a)
+      apply auto
+      apply (case_tac lnode)
+      apply auto
+
+  apply (case_tac "s r")
+    apply auto
+
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+
+      apply (simp add:norm_entries_list_h_simps)
+done
+
+lemma map_and_first_are_equal:
+"\<forall> k env.
+map_of (map (\<lambda>e. (entry_to_key env e, e)) list) k =
+(case first list (\<lambda>x. k = entry_to_key env x) of None \<Rightarrow> None | Some i \<Rightarrow> nth_from_1 list i)"
+apply auto
+apply (induct list)
+  (* list = [] *)
+  apply (simp add:first_def)
+
+  (* list = a#list *)
+  apply (simp add:first_def)
+  apply auto
+  
+    apply (case_tac "map Suc (find_indices (\<lambda>x. k = entry_to_key env x) list)")
+      apply auto
+done
+
+lemma nth_first_is_list_find_simp:
+"\<forall> p. List.find p list = nth_from_1 list (case first list p of None \<Rightarrow> 0 | Some i \<Rightarrow> i) "
+apply (induct list)
+  apply (simp add:nth_from_1_def first_def)
+
+  apply auto
+  apply (simp add:first_def)
+
+  apply (simp add:first_def)
+  apply (case_tac "find_indices p list ")
+    apply auto
+done
+
+lemma map_and_listfind_equal:
+"\<forall> k env.
+map_of (map (\<lambda>e. (entry_to_key env e, e)) list) k = List.find (\<lambda> x . k = entry_to_key env x) list"
+apply auto
+apply (induct list)
+  apply auto
+done
+
+lemma listfind_append [simp] :
+"\<forall> P. List.find P (list @ list') = (let res = List.find P list in if res = None then List.find P list' else res)"
+apply auto
+apply (case_tac "List.find P list")
+  apply auto
+  apply (induct list)
+    apply auto
+
+  apply (induct list)
+    apply auto
+done
+
+lemma listfind_append_list_with_concat :
+"\<forall> k P e list. None = List.find P list \<longrightarrow> List.find P (List.concat list') = List.find P ((List.concat list') @ list)"
+apply auto
+apply (case_tac " List.find P (List.concat list')")
+  apply auto
+done
+
+lemma listfind_and_concat1:
+"\<forall> P e list. Some e = List.find P list \<longrightarrow> \<not> None = List.find P ((List.concat list') @ list)"
+apply auto
+  apply (case_tac "List.find P (List.concat list')")
+      apply auto
+done
+
+lemma listfind_concat_a_list_exists [simp]:
+"\<forall> P e. Some e = List.find P (List.concat list) \<longrightarrow> (\<exists> list' \<in> set list . Some e  = List.find P list' )"
+apply auto
+apply (induct list)
+  apply auto
+
+  apply (case_tac "List.find P a")
+    apply auto
+done
+
+lemma listfind_concat_a_list_exists1 [simp]:
+"\<forall> P e. Some e = List.find P (List.concat list) \<longrightarrow> (\<exists> list' \<in> set list . Some e  = List.find P list' \<longrightarrow>
+List.find P (List.concat list) = List.find P list')"
+apply auto
+apply (case_tac list)
+  apply auto
+done
+
+lemma norm_find_entry_equal_to_map_lookup1 [simp]:
+"\<forall> env k c s r .
+let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
+find_entry (norm_find_h env (Some(Find k),r,s) h) = 
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
+apply (simp add:map_and_listfind_equal)
+apply auto
+apply (induct h)
+  apply (simp add:norm_find_h.simps find_trans_def)
+  apply (case_tac "s r")
+    apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "first aa (key_lt env k)")
+        apply (case_tac b)
+        apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+        apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+        apply auto
+        apply (case_tac "nth_from_1 b a")
+          apply auto
+          apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+          apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+      apply (case_tac lnode)
+        apply auto
+        apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+          apply (simp add:find_entry.simps norm_entries_list_h.simps nth_first_is_list_find_simp)
+
+          apply (simp add:find_entry.simps norm_entries_list_h.simps nth_first_is_list_find_simp)
+
+  apply (simp add:norm_find_h_simps find_trans_def)
+  apply (case_tac "s r")
+    apply (simp add:find_entry.simps norm_entries_list_h_simps)
+
+    apply (case_tac a)
+      apply (case_tac inode)
+      apply auto
+      apply (case_tac "first aa (key_lt env k)")
+      apply auto
+        apply (case_tac b)
+          apply (simp add:find_entry.simps norm_entries_list_h_simps)
+
+          apply (simp add: norm_entries_list_h_simps)
+          apply auto
+          (* it is necessary to show that find does not need to enter all the branches *)
+            apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) y")
+              apply auto
+              apply (case_tac "norm_entries_list_h s ((a # list) ! length list) h")
+                apply auto
+
+
+oops
+
 lemma norm_find_entry_equal_to_map_lookup [simp]:
 "\<forall> env k c s r .
 let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
 find_entry (norm_find_h env (Some(Find k),r,s) h) = 
 (map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
-apply (simp add:Let_def)
+apply (simp add:Let_def map_and_first_are_equal)
 apply (induct h)
   apply auto
   apply (simp add:norm_find_h.simps find_trans_def)
@@ -565,8 +712,11 @@ apply (induct h)
         apply auto
         apply (case_tac b)
           apply (simp add:find_entry.simps)
+
           apply (simp add:norm_entries_list_h_simps first_def)
+          apply (simp add:norm_entries_list_h_simps)
           apply auto
+          
     
 (* THIS IS THE LNODE CASE, uncomment after INODE CASE is solved
       apply (case_tac lnode)
