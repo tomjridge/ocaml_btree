@@ -591,19 +591,27 @@ done
 lemma listfind_concat_a_list_exists1 [simp]:
 "\<forall> P e. Some e = List.find P (List.concat list) \<longrightarrow> (\<exists> list' \<in> set list . Some e  = List.find P list' \<longrightarrow>
 List.find P (List.concat list) = List.find P list')"
-apply auto
-apply (case_tac list)
-  apply auto
+apply(force)
 done
 
+lemma nth_from_1_length: "nth_from_1 b (length b) = None \<Longrightarrow> b=[]"
+  sorry
+
+lemma sorry_fixme: "P"
+  sorry
+
+
+lemma "(List.find P xs = None) \<Longrightarrow> List.find P y \<noteq> None \<Longrightarrow> List.find P y = List.find P (List.concat (xs#(y#ys)))"
+  oops
+
 lemma norm_find_entry_equal_to_map_lookup1 [simp]:
-"\<forall> env k c s r .
+"\<forall> (* env k s *) r .
 let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
 find_entry (norm_find_h env (Some(Find k),r,s) h) = 
 (map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
 apply (simp add:map_and_listfind_equal)
-apply auto
-apply (induct h)
+apply (induct h, auto)
+  (* 0 *)
   apply (simp add:norm_find_h.simps find_trans_def)
   apply (case_tac "s r")
     apply (simp add:find_entry.simps norm_entries_list_h.simps)
@@ -631,18 +639,66 @@ apply (induct h)
 
           apply (simp add:find_entry.simps norm_entries_list_h.simps nth_first_is_list_find_simp)
 
+  (* Suc *)
   apply (simp add:norm_find_h_simps find_trans_def)
   apply (case_tac "s r")
+    (* s r = None *)
     apply (simp add:find_entry.simps norm_entries_list_h_simps)
 
+    (* s r = Some a *)
     apply (case_tac a)
+      (* a = Inode inode *)
       apply (case_tac inode)
       apply auto
+      (* s r = Some (INode (I (aa, b))) *)
       apply (case_tac "first aa (key_lt env k)")
-      apply auto
-        apply (case_tac b)
+       (* first aa (key_lt env k) = None *)
+       apply auto
+       (* we know that nth_from_1 b (length b) is not None, unless b is [] *)
+       apply(case_tac "b=[]")
+        (* b cannot have length 0, by well-formedness *)
+        (* let's try to prove without well-formedness *)
+        apply(case_tac b, auto)
+        apply (force simp add:find_entry.simps norm_entries_list_h_simps)
+
+        (* b \<noteq> [] *)
+        apply(case_tac " nth_from_1 b (length b)")
+         (* ... = None *)
+         apply(force simp add:  nth_from_1_length)
+
+         (* ... = Some a *)
+         apply(simp)
+         apply(simp add: norm_entries_list_h_simps)
+         apply(rule)
+          apply(rule)
+          apply(subgoal_tac "\<exists>y. norm_entries_list_h s a h = Some y")
+           prefer 2
+            
+           apply(subgoal_tac "a : set b")
+            prefer 2
+            apply(force intro: sorry_fixme)
+           apply(force)
+         apply(auto)
+
+
+
+lemma GOT TO HERE
+
+
+        apply(simp add:  nth_from_1_length)
+
+       apply(simp add: nth_from_1_length)
+       apply(case_tac "nth_from_1 b (length b)")
+        (*  nth_from_1 b (length b) = None *)
+        apply(case_tac "b")
+         apply(simp add: find_entry.simps)
+
+
+       apply (case_tac b)
+          (* b=[] *)
           apply (simp add:find_entry.simps norm_entries_list_h_simps)
 
+          (* b = a # list *)
           apply (simp add: norm_entries_list_h_simps)
           apply auto
           (* it is necessary to show that find does not need to enter all the branches *)
@@ -650,7 +706,11 @@ apply (induct h)
               apply auto
               apply (case_tac "norm_entries_list_h s ((a # list) ! length list) h")
                 apply auto
-
+                apply(case_tac "list")
+                 apply(force)
+                 nth_from_1_length
+                 apply(simp)
+                 
 
 oops
 
@@ -670,7 +730,7 @@ apply (induct h)
     apply (case_tac a)
       apply (case_tac inode)
         apply auto
-        apply (case_tac "first aa (key_lt env k)")
+        apply (case_tac "first aa (key_lt env k)"):
           apply auto
           apply (case_tac b)
             apply (simp add:find_entry.simps)
