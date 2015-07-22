@@ -7,7 +7,6 @@ let
     isabelle = import ./isabelle { };
     ocaml = pkgs.ocaml_4_02_1;
     findlib = pkgs.ocamlPackages_4_02_1.findlib;
-    zarith = import ./zarith { };
     bisect = import ./bisect { };
     lem = import ./lem { };
 in stdenv.mkDerivation {
@@ -18,7 +17,7 @@ in stdenv.mkDerivation {
 
     gmpLibPath = stdenv.lib.makeLibraryPath [ pkgs.gmp5 ];
     src = lem;
-    buildInputs = [ perl isabelle lem ocaml findlib bisect zarith];
+    buildInputs = [ perl isabelle lem ocaml findlib bisect];
 
     configurePhase = "true"; 	# Skip configure
 

@@ -23,9 +23,8 @@ lemma wf_btree_requires_qs_length_to_be_at_least_2_if_inodes_exist [simp]:
 s r = Some(INode(I(ds,qs))) \<longrightarrow>
 (let n = case s r of Some(LNode(L(es))) \<Rightarrow> (length es) | Some(INode(I(_,es))) \<Rightarrow> (length es) | _ \<Rightarrow> 0 in
  let all_entries = (case (entries_list_h s r h) of (Some list) \<Rightarrow> set list | None \<Rightarrow> {}) in
-wf_btree env s (r, all_entries,n) h \<longrightarrow> (Suc(length ds) = length qs) \<and> (length ds > 0) \<and> (length qs \<ge> 2))"
-apply (simp add:wf_btree_def)
-apply (induct h rule:norm_wf_btree.induct)
+norm_wf_btree env s (r, all_entries,n) h \<longrightarrow> (Suc(length ds) = length qs) \<and> (length ds > 0) \<and> (length qs \<ge> 2))"
+apply (induct h)
   apply simp
   
   apply auto
@@ -34,7 +33,7 @@ apply (induct h rule:norm_wf_btree.induct)
 
 apply (case_tac ds)
   apply auto
-oops
+done
 
 lemma if_find_indices_finds_index_then_the_element_exists [simp]:
 "\<forall> p n ns. find_indices p list = n # ns \<longrightarrow>
@@ -588,21 +587,23 @@ apply (induct list)
     apply auto
 done
 
-lemma listfind_concat_a_list_exists1 [simp]:
-"\<forall> P e. Some e = List.find P (List.concat list) \<longrightarrow> (\<exists> list' \<in> set list . Some e  = List.find P list' \<longrightarrow>
-List.find P (List.concat list) = List.find P list')"
-apply(force)
-done
 
 lemma nth_from_1_length: "nth_from_1 b (length b) = None \<Longrightarrow> b=[]"
-  sorry
+apply (case_tac b)
+  apply auto
+done
+
 
 lemma sorry_fixme: "P"
   sorry
 
 
-lemma "(List.find P xs = None) \<Longrightarrow> List.find P y \<noteq> None \<Longrightarrow> List.find P y = List.find P (List.concat (xs#(y#ys)))"
-  oops
+lemma listfind_returns_the_first_element_satisfying_P: 
+"(List.find P xs = None) \<Longrightarrow> List.find P y \<noteq> None \<Longrightarrow> List.find P y = List.find P (List.concat (xs#(y#ys)))"
+apply simp
+apply (case_tac "List.find P y")
+apply simp_all
+done
 
 lemma norm_find_entry_equal_to_map_lookup1 [simp]:
 "\<forall> (* env k s *) r .
