@@ -3,8 +3,8 @@ SHELL:=bash
 #LEMFLAGS:=-only_changed_output -wl_unused_vars ign -wl_rename err
 LEM:=$(shell command -v ../src_ext/lem/lem || command -v lem)
 EXTRACTDIR:=$(shell dirname $(LEM))/ocaml-lib/
-CAMLCINCLUDES:=-I $(EXTRACTDIR) extract.cma -I $(EXTRACTDIR)/dependencies/zarith zarith.cma
-CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -linkpkg 
+CAMLCINCLUDES:=-I $(EXTRACTDIR)/dependencies/zarith zarith.cma -I $(EXTRACTDIR) extract.cma
+CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -linkpkg
 
 BTREE_FILE:=btree.lem
 BTREE_TESTS_FILE:=btreeTests.lem
@@ -31,11 +31,11 @@ build_ocaml: generate_ocaml_btree
 
 run_ocaml_tests: build_ocaml
 	$(CAMLC) \
-		-package bisect -syntax camlp4o -o $(OC_GEN_DIR)/tests -I $(OC_GEN_DIR) $(OC_GEN_DIR)/btree.ml $(OC_GEN_DIR)/btreeTests.ml $(OC_GEN_DIR)/btreeTestsAuxiliary.ml
+		-package bisect_ppx -o $(OC_GEN_DIR)/tests -I $(OC_GEN_DIR) $(OC_GEN_DIR)/btree.ml $(OC_GEN_DIR)/btreeTests.ml $(OC_GEN_DIR)/btreeTestsAuxiliary.ml
 	./$(OC_GEN_DIR)/tests
 	mkdir -p $(COVERAGE_DIR)
 	mv bisect*.out $(COVERAGE_DIR)
-	bisect-report -html $(COVERAGE_DIR) $(BISECT_FILE)
+	bisect-ppx-report -html $(COVERAGE_DIR) $(BISECT_FILE)
 	echo "to see the report use:"
 	echo "firefox $(COVERAGE_DIR)/index.html"
 

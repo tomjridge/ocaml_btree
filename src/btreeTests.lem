@@ -3,9 +3,6 @@ open import Btree
 
 (* utility unit tests *)
 
-(* sort *)
-assert sort_should_sort_in_increasing_order: Utility.sort (<) [(4:nat);3;1;2] = [1;2;3;4]
-assert sort_should_sort_in_decreasing_order: Utility.sort (>) [1;2;3;4] = [(4:nat);3;2;1]
 (* nth_from_1 *)
 assert nth_from_1_should_return_the_right_element: Utility.nth_from_1 [(1:nat);2;3;4] 3 = Just (3:nat)
 assert nth_from_1_should_return_nothing_if_the_index_is_too_big: Utility.nth_from_1 [(1:nat)] 10 = Nothing
@@ -60,15 +57,11 @@ assert entry_lte_should_be_true_if_first_smaller: Fs_impl_types.entry_lte Fs_imp
 assert entry_lte_should_be_true_if_equal: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 2) (Fs_impl_types.Entry 2) = true
 assert entry_lte_should_be_false_if_first_greater: Fs_impl_types.entry_lte Fs_impl_types.nat_env (Fs_impl_types.Entry 3) (Fs_impl_types.Entry 2) = false
 
-(* sorted_entry_list *)
-assert sorted_entry_should_be_true_if_list_in_increasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 1); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 3)] = true
-assert sorted_entry_should_be_true_if_empty_list: BTree.sorted_entry_list Fs_impl_types.nat_env ([]:list (Fs_impl_types.entry nat)) = true
-assert sorted_entry_should_be_false_if_list_in_decreasing_ordered: BTree.sorted_entry_list Fs_impl_types.nat_env [(Fs_impl_types.Entry 3); (Fs_impl_types.Entry 2); (Fs_impl_types.Entry 1)] = false
 (* entries_list_h *)
-assert entries_list_h_should_get_0_2_entries_from_leaf_with_0_2: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) 1 = [Fs_impl_types.Entry 0;Fs_impl_types.Entry 2]
-assert entries_list_h_should_get_0_2_3_5_entries_from_inode_pointing_to_leaves: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) 2 = [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)]
-assert entries_list_h_should_return_empty_when_id_not_in_store: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) 1 = []
-assert entries_list_h_should_return_empty_when_empty_store: BTree.entries_list_h ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) 0 = []
+assert entries_list_h_should_get_0_2_entries_from_leaf_with_0_2: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) 1 = Just [Fs_impl_types.Entry 0;Fs_impl_types.Entry 2]
+assert entries_list_h_should_get_0_2_3_5_entries_from_inode_pointing_to_leaves: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 1])))); (Fs_impl_types.Page_id 1,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 3; Fs_impl_types.Entry 5])))); (Fs_impl_types.Page_id 2,(Fs_impl_types.INode(Fs_impl_types.I([Fs_impl_types.Key 2],[Fs_impl_types.Page_id 0; Fs_impl_types.Page_id 1]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 2) 2 = Just [(Fs_impl_types.Entry 0);(Fs_impl_types.Entry 1);(Fs_impl_types.Entry 3);(Fs_impl_types.Entry 5)]
+assert entries_list_h_should_return_empty_when_id_not_in_store: BTree.entries_list_h ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) 1 = Nothing
+assert entries_list_h_should_return_empty_when_empty_store: BTree.entries_list_h ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) 0 = Nothing
 (* get_m *)
 assert get_m_should_return_nothing_when_empty_store: BTree.get_m ((Map.fromList []):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 0) = Nothing
 assert get_m_should_return_nothing_when_id_not_in_store: BTree.get_m ((Map.fromList [(Fs_impl_types.Page_id 0,(Fs_impl_types.LNode(Fs_impl_types.L([Fs_impl_types.Entry 0; Fs_impl_types.Entry 2]))))]):Fs_impl_types.store nat nat nat) (Fs_impl_types.Page_id 10) = Nothing
