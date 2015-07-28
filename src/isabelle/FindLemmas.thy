@@ -76,6 +76,167 @@ done
 
 (* find_entry behaves as a map lookup *)
 
+lemma norm_find_entry_equal_to_map_lookup_if_wf_btree:
+"\<forall> (* env k s *) r .
+let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
+norm_wf_btree env s (r,set all_entries,n) h \<longrightarrow> 
+(find_entry (norm_find_h env (Some(Find k),r,s) h) = 
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k))"
+apply (simp add:map_and_listfind_equal)
+apply (induct h, auto)
+ (* 0 *)
+ apply (simp add:norm_find_h.simps find_trans_def)
+ apply (case_tac "s r")
+  apply (simp add:find_entry.simps norm_entries_list_h.simps)
+
+  apply (case_tac a)
+   apply (case_tac inode)
+   apply auto
+
+   apply (case_tac lnode)
+   apply simp
+    apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+    apply (simp add:nth_first_is_list_find_simp find_entry.simps norm_entries_list_h.simps )
+
+    apply (simp add:nth_first_is_list_find_simp find_entry.simps norm_entries_list_h.simps )
+    
+  (* Suc *)
+  (* these are the steps of the proof:
+  - show that the list is ordered (solving the conditions of wf_btree)
+  - bring the rec-clause from a List.all to a singular
+    (this should be something like: we are interested only in descending the same subtree norm_entries_list_h descends)
+  - show that with an ordered list, List.find .. h = List.find .. Suc h
+  *)
+  apply (case_tac "s r")
+   (* None *)
+   apply simp
+
+   (*Some a*)
+   apply (case_tac a)
+   defer
+    (* a = lnode *)
+    apply simp
+
+    (* a = inode *)
+    apply (case_tac inode)
+    apply (case_tac prod)
+    apply simp
+    apply (case_tac "n \<noteq> length b")
+     (*n \<noteq> length b*)
+     apply simp
+
+     (*n = length b*)
+     apply simp
+     apply (case_tac "Suc (length aa) \<noteq> length b")
+     (*Suc (length aa) \<noteq> length b*)
+      apply simp
+
+     (*Suc (length aa) = length b*)
+      apply (case_tac "aa")
+       (* aa = [] *)
+       apply simp
+
+       (* aa \<noteq> [] *)
+       apply (simp add:Let_def)
+       (*now we try to show that the list of entries must be ordered *)
+       (* union_clause : 
+        we know that ss is norm_entries_list_h and it is not None *)
+       apply (case_tac "norm_entries_list_h s r (Suc h)")
+        (* norm_entries_list_h s r (Suc h) = None *)
+        apply simp
+
+        (* norm_entries_list_h s r (Suc h) = Some list *)
+        apply simp
+        (* cond_mj *)
+        apply (case_tac "\<forall>j\<in>set (from_to (Suc 0) (length b)). 
+          case case nth_from_1 b j of None \<Rightarrow> None | Some x \<Rightarrow> get_m s x of None \<Rightarrow> False | Some x \<Rightarrow> minN env \<le> x")
+        defer
+         (* cond_mj = False*)
+         apply simp
+
+         (* cond_mj = True*)
+         apply simp
+         (* now we solve cond_s1: we know that the first subtree has the smallest keys *)
+         apply (case_tac "index b 0")
+          (* index b 0 = None *)
+          apply simp
+
+          apply simp
+          apply (case_tac "norm_entries_list_h s (b ! 0) h")
+           (* norm_entries_list_h s (b ! 0) h = None *)
+           apply simp
+
+           (* norm_entries_list_h s (b ! 0) h = Some ae *)
+           apply simp
+           apply (case_tac "\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab")
+           defer
+            (*\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab = False *)
+            apply simp
+
+            (*\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab*)
+            apply simp
+            (* cond_sn: we know that the last subtree has the biggest keys*)
+            apply (case_tac "nth_from_1 (ab # list) (length b - Suc 0)")
+             apply simp
+
+             apply simp
+             apply (case_tac " nth_from_1 b (length b)")
+              apply simp
+
+              apply simp
+              apply (case_tac "norm_entries_list_h s ag h")
+               (* norm_entries_list_h s ag h = None *)
+               apply simp
+
+               (*norm_entries_list_h s ag h = Some ah*)
+               apply simp
+               apply (case_tac "(\<forall>s\<in>set ah. key_lte env af (entry_to_key env s))")
+               defer
+                (*not \<forall>s\<in>set ah. key_lte env af (entry_to_key env s)*)
+                apply simp
+
+                (*\<forall>s\<in>set ah. key_lte env af (entry_to_key env s)*)
+                apply simp
+                (* cond_sj : we know that all the subtrees have keys in increasing order*)
+                apply (case_tac " \<forall>j\<in>set (from_to (Suc 0) (length b - 2)). \<exists> qi . index b j = Some qi")
+                defer
+                 apply simp
+                 apply force
+
+                 (* \<forall>j\<in>set (from_to (Suc 0) (length b - 2)). \<exists> qi . index b j = Some qi *)
+                 apply simp
+                 apply (case_tac "\<forall>j\<in>set (from_to (Suc 0) (length b - 2)). \<exists> sl . norm_entries_list_h s (b ! j) h = Some sl")
+                 defer
+                  apply simp
+                  apply force
+
+                  (* \<forall>j\<in>set (from_to (Suc 0) (length b - 2)). \<exists> l . norm_entries_list_h s (b ! j) h = Some l *)
+                  apply clarsimp
+                  apply(subgoal_tac " \<forall>j\<in>set (from_to (Suc 0) (length ba - 2)).\<forall> sl.  (norm_entries_list_h s (ba ! j) h = Some sl) \<longrightarrow>
+       (\<forall>s\<in>set sl. key_lte env a (entry_to_key env s)) \<and> (\<forall>s\<in>set sl. key_lt env (entry_to_key env s) ((ab # list) ! j))")
+                   prefer 2
+                   apply(rule)
+                   apply(rule)
+                   apply(rule)
+                   apply(subgoal_tac " \<exists>sl. norm_entries_list_h s (ba ! j) h = Some sl")
+                    prefer 2
+                    apply(force)
+                   apply(erule exE)
+                   apply(erule_tac x=j in ballE) back back back back
+                   apply(simp)
+                   apply (case_tac "nth_from_1 (ab # list) j")
+                    (* nth_from_1 (ab # list) j = None*)
+                    apply simp
+
+                    (* nth_from_1 (ab # list) j = Some*)
+                    apply simp
+                    apply (case_tac "index (ab # list) j")
+                     apply simp
+
+                     
+                  apply clarify
+
+oops
 lemma norm_find_entry_equal_to_map_lookup [simp]:
 "\<forall> (* env k s *) r .
 let all_entries = (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
@@ -136,7 +297,7 @@ apply (induct h, auto)
         (* b \<noteq> [] *)
         apply(case_tac " nth_from_1 b (length b)")
          (* ... = None *)
-         apply(force simp add:  nth_from_1_length)
+         apply(force simp add:nth_from_1_length)
 
          (* ... = Some a *)
          apply(simp)

@@ -512,24 +512,55 @@ apply (induct list)
     apply auto
 done
 
-
 lemma nth_from_1_length [simp]: "nth_from_1 b (length b) = None \<Longrightarrow> b=[]"
 apply (case_tac b)
   apply auto
 done
 
-
 lemma sorry_fixme: "P"
   sorry
 
-
-lemma listfind_returns_the_first_element_satisfying_P: 
+lemma listfind_returns_the_first_element_satisfying_P [simp]: 
 "(List.find P xs = None) \<Longrightarrow> List.find P y \<noteq> None \<Longrightarrow> List.find P y = List.find P (List.concat (xs#(y#ys)))"
 apply simp
 apply (case_tac "List.find P y")
-apply simp_all
+ apply simp_all
 done
 
+lemma listfind_returns_the_first_element_satisfying_P2 [simp]: 
+"(List.find P xs = None) \<Longrightarrow> P y \<Longrightarrow> List.find P (y#ys) = (index (xs@(y#ys)) (length xs))"
+apply auto
+done
+
+
+lemma norm_wf_btree_h0_is_true_if:
+"\<forall> env s r all_entries n. 
+norm_wf_btree env s (r, all_entries,n) 0 \<longrightarrow>
+(case s r of 
+  Some(LNode (L es)) \<Rightarrow>
+    (n = length es)
+    \<and>
+    (n \<le> maxN env)
+    \<and>
+    (set es =  all_entries)
+    \<and>
+    (sorted_by (entry_lt env) es)
+  | _ \<Rightarrow> False)
+"
+apply auto
+apply (case_tac "s r")
+ apply simp
+
+ apply (case_tac a)
+ apply simp
+
+ apply (case_tac lnode)
+ apply (simp add:Let_def)
+ apply (case_tac "length list = n \<and> length list \<le> maxN env")
+  apply simp
+  apply (case_tac "all_entries = set list")
+   apply simp_all
+done
 
 lemma norm_wf_btree_requires_qs_length_to_be_at_least_2_if_inode_exist:
 "\<forall> env k c s r ds qs. 
@@ -548,5 +579,95 @@ apply (case_tac ds)
   apply auto
 done
 
+lemma ordered_norm_entries_list_if_norm_wf_btree:
+"norm_wf_btree env s (r,ss,n) h \<longrightarrow> 
+sorted_by (entry_lt env) (case (norm_entries_list_h s r h) of Some list \<Rightarrow> list | _ \<Rightarrow> [])"
+apply (case_tac h)
+ apply simp
+ apply (case_tac "s r")
+  apply simp
+
+  apply (case_tac a)
+   apply simp
+
+   apply (case_tac lnode)
+   apply (simp add:Let_def)
+   apply (case_tac "length list \<noteq> n")
+    (*length list \<noteq> n*)
+    apply simp
+
+    (* length list = n*)
+    apply (case_tac "length list > maxN env")
+     apply simp
+
+     (*length list \<le> maxN env*)
+     apply simp
+     apply (case_tac "ss \<noteq> set list")
+      apply simp
+
+      (* ss = set list *)
+      apply (simp add:norm_entries_list_h.simps)
+ (* Suc nat*)
+ apply simp
+ apply (case_tac "s r")
+  apply simp
+
+  apply (case_tac a)
+   defer
+   (* a = lnode *)
+   apply simp
+
+   apply (case_tac inode)
+   apply (case_tac prod)
+   apply (simp add:Let_def)
+   apply (case_tac "length b \<noteq> n")
+    (*length list \<noteq> n*)
+    apply simp
+
+    (* length list = n*)
+    apply (case_tac "length b \<noteq> Suc (length aa)")
+     apply simp
+
+     (*length list \<le> maxN env*)
+     apply simp
+     apply (case_tac aa)
+      apply simp
+
+      (*aa = ab # list *)
+      apply (simp add:Let_def)
+      apply (case_tac "norm_entries_list_h s r (Suc nat)")
+       apply simp
+
+       (* norm_entries_list_h s r (Suc nat) = Some ac*)
+       apply simp 
+       apply (case_tac "ss \<noteq> set ac")
+        apply simp
+
+        (* ss = set ac*)
+        apply simp
+        apply (case_tac "norm_entries_list_h s (b ! Suc (length list)) nat")
+         apply simp
+
+         (* norm_entries_list_h s (b ! Suc (length list)) nat = Some ad*)
+         apply simp
+         apply (case_tac "\<not>(\<forall>s\<in>set ad. key_lte env ((ab # list) ! length list) (entry_to_key env s))")
+          apply simp
+          apply force
+
+          (*(\<forall>s\<in>set ad. key_lte env ((ab # list) ! length list) (entry_to_key env s)) = True*)
+          apply simp
+          apply (case_tac "norm_entries_list_h s (b ! 0) nat")
+           apply simp
+
+           (*norm_entries_list_h s (b ! 0) nat = ab*)
+           apply simp
+           apply (case_tac "\<not>(\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab)")
+            apply simp
+            apply force
+
+            (* \<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab *)
+            apply simp
+            
+oops
 
 end
