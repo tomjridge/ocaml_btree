@@ -532,6 +532,14 @@ lemma listfind_returns_the_first_element_satisfying_P2 [simp]:
 apply auto
 done
 
+(* norm_wf_btree*)
+
+(** helpers *)
+lemma union_clause_if [simp]:
+"union_clause sset s r h \<longrightarrow> sset = (set (case (norm_entries_list_h s r h) of None \<Rightarrow> [] | Some list \<Rightarrow> list))"
+apply (case_tac "norm_entries_list_h s r h")
+ apply (simp_all add:union_clause_def)
+done
 
 lemma norm_wf_btree_h0_is_true_if:
 "\<forall> env s r all_entries n. 
@@ -580,7 +588,7 @@ apply (case_tac ds)
 done
 
 lemma ordered_norm_entries_list_if_norm_wf_btree:
-"norm_wf_btree env s (r,ss,n) h \<longrightarrow> 
+"norm_wf_btree env s (r,sset,n) h \<longrightarrow> 
 sorted_by (entry_lt env) (case (norm_entries_list_h s r h) of Some list \<Rightarrow> list | _ \<Rightarrow> [])"
 apply (case_tac h)
  apply simp
@@ -602,7 +610,7 @@ apply (case_tac h)
 
      (*length list \<le> maxN env*)
      apply simp
-     apply (case_tac "ss \<noteq> set list")
+     apply (case_tac "sset \<noteq> set list")
       apply simp
 
       (* ss = set list *)
@@ -635,39 +643,21 @@ apply (case_tac h)
 
       (*aa = ab # list *)
       apply (simp add:Let_def)
+      apply (simp add:union_clause_def)
       apply (case_tac "norm_entries_list_h s r (Suc nat)")
        apply simp
 
-       (* norm_entries_list_h s r (Suc nat) = Some ac*)
-       apply simp 
-       apply (case_tac "ss \<noteq> set ac")
+       (* norm_entries_list_h s r (Suc nat) *)
+       apply simp
+       apply (case_tac "sset ~= set ac")
         apply simp
 
-        (* ss = set ac*)
+        (* sset = set ac *)
         apply simp
-        apply (case_tac "norm_entries_list_h s (b ! Suc (length list)) nat")
+        apply (case_tac "\<not> cond_mj env (Suc (Suc (length list))) b s")
          apply simp
 
-         (* norm_entries_list_h s (b ! Suc (length list)) nat = Some ad*)
          apply simp
-         apply (case_tac "\<not>(\<forall>s\<in>set ad. key_lte env ((ab # list) ! length list) (entry_to_key env s))")
-          apply simp
-          apply force
-
-          (*(\<forall>s\<in>set ad. key_lte env ((ab # list) ! length list) (entry_to_key env s)) = True*)
-          apply simp
-          apply (case_tac "norm_entries_list_h s (b ! 0) nat")
-           apply simp
-
-           (*norm_entries_list_h s (b ! 0) nat = ab*)
-           apply simp
-           apply (case_tac "\<not>(\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab)")
-            apply simp
-            apply force
-
-            (* \<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab *)
-            apply simp
-            
 oops
 
 end
