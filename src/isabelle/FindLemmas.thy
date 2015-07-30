@@ -280,11 +280,26 @@ apply (induct h, auto)
 
     (* s r = Some a *)
     apply (case_tac a)
+    defer
+     (* a = lnode *)
+     apply (case_tac lnode)
+      apply auto
+      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+        apply (simp add:find_entry.simps)
+        apply (simp add:norm_entries_list_h_simps first_def)
+
+        apply (case_tac h)
+          apply (simp add:norm_find_h.simps find_trans_def find_entry.simps)
+          apply (simp add:norm_entries_list_h.simps first_def)
+
+          apply (simp add:norm_find_h_simps find_trans_def find_entry.simps)
+          apply (simp add:norm_entries_list_h.simps first_def)
+
       (* a = Inode inode *)
       apply (case_tac inode)
       apply auto
       (* s r = Some (INode (I (aa, b))) *)
-      apply (case_tac "first aa (key_lt env k)")
+      apply (case_tac "first a (key_lt env k)")
        (* first aa (key_lt env k) = None *)
        apply auto
        (* we know that nth_from_1 b (length b) is not None, unless b is [] *)
@@ -304,15 +319,16 @@ apply (induct h, auto)
          apply(simp add: norm_entries_list_h_simps)
          apply(rule)
           apply(rule)
-          apply(subgoal_tac "\<exists>y. norm_entries_list_h s a h = Some y")
+          apply(subgoal_tac "\<exists>y. norm_entries_list_h s p h = Some y")
            prefer 2
             
-           apply(subgoal_tac "a : set b")
+           apply(subgoal_tac "p : set b")
             prefer 2
             apply(force intro: sorry_fixme)
            apply(force)
          apply(auto)
 
+         
 
 (* GOT TO HERE *)
 
@@ -343,18 +359,7 @@ apply (induct h, auto)
                  apply(simp)
                  
 (* THIS IS THE LNODE CASE, uncomment after INODE CASE is solved
-      apply (case_tac lnode)
-      apply auto
-      apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
-        apply (simp add:find_entry.simps)
-        apply (simp add:norm_entries_list_h_simps first_def)
-
-        apply (case_tac nat)
-          apply (simp add:norm_find_h.simps find_trans_def find_entry.simps)
-          apply (simp add:norm_entries_list_h.simps first_def)
-
-          apply (simp add:norm_find_h_simps find_trans_def find_entry.simps)
-          apply (simp add:norm_entries_list_h.simps first_def)
+      
 *) 
 sorry
 

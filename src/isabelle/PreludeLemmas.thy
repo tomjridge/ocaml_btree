@@ -587,6 +587,29 @@ apply (case_tac ds)
   apply auto
 done
 
+lemma sorted_by_concat:
+"sorted_by P (l@l') \<longrightarrow>
+ (sorted_by P l)
+ \<and>
+ (sorted_by P l')
+"
+apply clarify
+ apply (induct l)
+  apply simp
+
+  apply clarsimp
+  apply (case_tac l')
+   apply simp
+
+   apply clarsimp
+   apply (case_tac l)
+    apply simp+
+done
+
+lemma ordering:
+"sorted_by (entry_lt env) (l@l') \<longrightarrow> (\<forall> x \<in> set l. \<forall> y \<in> set l'. (entry_lt env) x y)"
+oops
+
 lemma ordered_norm_entries_list_if_norm_wf_btree:
 "norm_wf_btree env s (r,sset,n) h \<longrightarrow> 
 sorted_by (entry_lt env) (case (norm_entries_list_h s r h) of Some list \<Rightarrow> list | _ \<Rightarrow> [])"
@@ -654,10 +677,13 @@ apply (case_tac h)
 
         (* sset = set ac *)
         apply simp
-        apply (case_tac "\<not> cond_mj env (Suc (Suc (length list))) b s")
+        apply clarsimp
+        apply (simp add:norm_entries_list_h_simps)
+        apply (case_tac "\<not>(\<forall>x\<in>set ba. \<exists>y. norm_entries_list_h s x nat = Some y)")
          apply simp
 
          apply simp
+         apply clarify
 oops
 
 end
