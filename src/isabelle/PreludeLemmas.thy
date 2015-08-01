@@ -502,6 +502,16 @@ apply auto
       apply auto
 done
 
+lemma listfind_and_concat_with_equality:
+"\<forall> e list. List.find (op = e) list = Some e \<longrightarrow> List.find (op = e) ((List.concat list') @ list) = Some e"
+apply auto
+ apply (case_tac "List.find (op = e) (List.concat list')")
+ apply simp+
+
+ apply (simp add:find_Some_iff)
+ apply clarsimp
+done
+
 lemma listfind_concat_a_list_exists [simp]:
 "\<forall> P e. Some e = List.find P (List.concat list) \<longrightarrow> (\<exists> list' \<in> set list . Some e  = List.find P list' )"
 apply auto
