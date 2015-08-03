@@ -73,7 +73,7 @@ apply (case_tac "a")
         apply auto
         apply (case_tac inode)
         apply auto
-        apply (case_tac " nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac " nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
        
         apply (case_tac lnode)
@@ -102,7 +102,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -137,7 +137,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -228,7 +228,7 @@ apply (induct h)
         apply (case_tac aa)
           apply (case_tac inode)
           apply auto
-          apply (case_tac "first a (key_lt env key)")
+          apply (case_tac "first a (key_lt0 env key)")
             apply (simp add:nth_from_1_def)
             apply (case_tac b)
               apply auto
@@ -256,7 +256,7 @@ apply (induct h)
             apply (case_tac a)
               apply (case_tac inode)
               apply auto
-              apply (case_tac "first aa (key_lt env key)")
+              apply (case_tac "first aa (key_lt0 env key)")
               apply (simp add:nth_from_1_def)
               apply (case_tac b)
                 apply auto
@@ -297,7 +297,7 @@ apply (induct h)
       apply (case_tac a)
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first aa (key_lt0 env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
         apply (case_tac lnode)
@@ -312,7 +312,7 @@ apply (induct h)
       apply (case_tac a)
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first aa (key_lt0 env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
         apply (case_tac lnode)
@@ -360,7 +360,7 @@ apply (case_tac h)
         apply (case_tac a)
           apply (case_tac inode)
           apply auto
-          apply (case_tac "first aa (key_lt env key)")
+          apply (case_tac "first aa (key_lt0 env key)")
             apply (case_tac b)
               apply auto
 
@@ -671,12 +671,13 @@ apply (case_tac h)
 
            (*norm_entries_list_h s (b ! 0) nat = ab*)
            apply simp
-           apply (case_tac "\<not>(\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab)")
+           apply (case_tac "\<not>(\<forall>s\<in>set ae. key_lt0 env (entry_to_key env s) ab)")
             apply simp
             apply force
 
             (* \<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab *)
-            apply simp
+            apply (simp add:key_lt0_def)
+            
             
 oops
 

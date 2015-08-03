@@ -26,7 +26,7 @@ apply (induct h)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt env k)")
+      apply (case_tac "first aa (key_lt0 env k)")
             apply (case_tac b)
               apply auto
 
@@ -49,7 +49,7 @@ apply (induct h)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt env k)")
+      apply (case_tac "first aa (key_lt0 env k)")
             apply (case_tac b)
               apply auto
 
@@ -172,7 +172,7 @@ apply (induct h, auto)
 
            (* norm_entries_list_h s (b ! 0) h = Some ae *)
            apply simp
-           apply (case_tac "\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab")
+           apply (case_tac "\<forall>s\<in>set ae. key_lt0 env (entry_to_key env s) ab")
            defer
             (*\<forall>s\<in>set ae. key_lt env (entry_to_key env s) ab = False *)
             apply simp
@@ -269,9 +269,15 @@ lemma norm_wf_btree_and_list_find:
 h = Suc h' \<longrightarrow>
 s r = Some (INode(I(aa,ba))) \<longrightarrow>
 norm_wf_btree env s (r,set all_entries,n) h \<longrightarrow>
-(first aa (key_lt env k) = None \<longrightarrow> (\<forall>n. (n < (length ba - Suc 0)) \<and> (List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba!n) h'))) = None))
+(first aa (key_lt env k) = None \<longrightarrow> 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s r (Suc h')))) = 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba ! ((length ba) - (Suc 0)))  h')))
+)
 \<and>
-(\<forall> a. first aa (key_lt env k) = Some a \<longrightarrow> (\<forall>n. (n < (a)) \<and> (List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba!n) h'))) = None))
+(first aa (key_lt env k) = Some a \<longrightarrow>
+((List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s r (Suc h')))) = 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba ! a)  h')))
+))
 "
 apply clarsimp
 apply (case_tac h)
@@ -317,7 +323,9 @@ apply (case_tac "n \<noteq> length ba")
         apply clarsimp
 
         apply clarsimp
-        apply (simp add:key_lte_def)
+        apply (simp add:key_lte_def key_lt0_def norm_entries_list_h_simps)
+         apply rule
+        
         (*it seems I cannot prove anything unless I have a concrete definition of key_lt: 
         I cannot prove that the sublists of entries are ordered*)
         
@@ -347,7 +355,7 @@ apply (induct h, auto)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt env k)")
+      apply (case_tac "first aa (key_lt0 env k)")
         apply (case_tac b)
         apply (simp add:find_entry.simps norm_entries_list_h.simps)
 
@@ -393,11 +401,39 @@ apply (induct h, auto)
       apply (case_tac inode)
       apply (case_tac prod)
       apply clarsimp
+      apply (case_tac "ba = []")
+       apply simp
+       apply (case_tac "first aa (key_lt0 env k)")
+        apply (simp add:find_entry.simps norm_entries_list_h_simps)
+        
+        apply (simp add:find_entry.simps norm_entries_list_h_simps nth_from_1_def)
+        apply (case_tac a)
+         apply (simp add:add:find_entry.simps)+
       (* s r = Some (INode (I (aa, b))) *)
-      apply (subgoal_tac "first aa (key_lt env k) = None \<longrightarrow> (\<forall>n. (n < (length ba - Suc 0)) \<and> (List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba!n) h))) = None)")
-      apply (subgoal_tac "\<forall> a. first aa (key_lt env k) = Some a \<longrightarrow> (\<forall>n. (n < (a)) \<and> (List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba!n) h))) = None)")
-      apply force
-       (* these subgoals require wf btree! !*)
+      (*we need wf_btree because we need to know the relation between keys and entries*)
+       apply (subgoal_tac "(first aa (key_lt0 env k) = None \<longrightarrow> 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s r (Suc h)))) = 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba ! ((length ba) - (Suc 0)))  h)))
+)
+\<and>
+(\<forall> a. first aa (key_lt0 env k) = Some a \<longrightarrow>
+((List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s r (Suc h)))) = 
+(List.find (\<lambda>x. k = entry_to_key env x) (the (norm_entries_list_h s (ba ! a)  h)))
+))")  
+      apply clarify
+      apply (case_tac "first aa (key_lt0 env k)")
+       apply simp
+       apply (case_tac " nth_from_1 ba (length ba)")
+        apply simp
+
+        apply (simp add:find_entry.simps nth_from_1_def)
+        apply (case_tac "length ba")
+         apply simp
+         (* blabla ... with this assumption the subgoals are true*)
+        
+       
+
+       
 sorry
 
 lemma find_entry_equal_to_map_lookup:

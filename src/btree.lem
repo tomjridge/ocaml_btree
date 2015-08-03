@@ -203,13 +203,25 @@ module Fs_impl_types = struct
         free_page_id = (fun store -> match (Sorting.insertSortBy (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
       |>
 
+    val key_lt : forall 'p 'e 'k.
+      env 'p 'e 'k ->
+      key 'k ->
+      key 'k ->
+      bool
+    let key_lt env k1 k2 =
+      (env.key_lt k1 k2)
+      &&
+        (not(env.key_lt k2 k1))
+      &&
+        (not (k1 = k2))
+
     val key_lte : forall 'p 'e 'k.
       env 'p 'e 'k ->
       key 'k ->
       key 'k ->
       bool
     let key_lte env k1 k2 =
-      env.key_lt k1 k2 || k1 = k2
+      key_lt env k1 k2 || k1 = k2
 
     val entry_lt : forall 'p 'e 'k.
       env 'p 'e 'k ->
@@ -217,7 +229,7 @@ module Fs_impl_types = struct
       entry 'e ->
       bool
     let entry_lt env e1 e2 =
-      env.key_lt (env.entry_to_key e1) (env.entry_to_key e2)
+      key_lt env (env.entry_to_key e1) (env.entry_to_key e2)
 
     val entry_lte : forall 'p 'e 'k.
       env 'p 'e 'k ->
@@ -407,7 +419,7 @@ module BTree = struct
                       | (Just sj', Just dj, Just dj') ->
                          Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
                          &&
-                           Set.all (fun s -> env.key_lt (env.entry_to_key s) dj') sj'
+                           Set.all (fun s -> key_lt env (env.entry_to_key s) dj') sj'
                       | _ -> false
                        end)
                     in
@@ -430,7 +442,7 @@ module BTree = struct
                     let s1 = ss 1 in
                     (match (d1,s1) with
                      | (Just d1,Just s1) ->
-                        Set.all (fun s -> env.key_lt (env.entry_to_key s) d1 ) s1
+                        Set.all (fun s -> key_lt env (env.entry_to_key s) d1 ) s1
                      | _ -> false
                      end))
                   in
@@ -510,7 +522,7 @@ module BTree = struct
         match (Map.lookup r sg) with
         | Just (INode(I(ds,ps))) -> (
           let i = (
-            match (first ds (fun x -> env.key_lt (env.entry_to_key a) x)) with
+            match (first ds (fun x -> key_lt env (env.entry_to_key a) x)) with
             | Just i -> i
             | _ -> List.length ds + 1 (*the key is bigger than all the keys of the INode, so we give the index of the bigger page_id we have *)
             end)
@@ -617,7 +629,7 @@ module BTree = struct
         match Map.lookup r sg with
         | Just (INode(I(ds,ps))) ->
            let i = (
-             match first ds (fun x -> env.key_lt k x) with
+             match first ds (fun x -> key_lt env k x) with
              | Just i -> i
              | _ -> List.length ps
              end)
@@ -692,7 +704,7 @@ module BTree = struct
         match (Map.lookup r sg) with
         | Just (INode(I(ds,ps))) -> (* DIDiscend *)
            let i = (
-             match first ds (fun x -> env.key_lt (env.entry_to_key c) x) with
+             match first ds (fun x -> key_lt env (env.entry_to_key c) x) with
              | Just i -> i
              | _ ->  List.length ds + 1
              end)
