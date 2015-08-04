@@ -187,16 +187,19 @@ module Fs_impl_types = struct
         minN: nat;
         (* entry to key *)
         entry_to_key: entry 'e -> key 'k;
-        (* less than on keys *)
-        key_lt : key 'k -> key 'k -> bool;
+        (* less than or equal on keys *)
+        key_lte : key 'k -> key 'k -> bool;
         (* get free page_id in store *)
         free_page_id : store 'p 'e 'k -> page_id 'p
       |>
 
-(*    val wf_env:: env 'p 'e 'k -> bool
-    let wf_env e0 = (
-      (isTotal e0.key_lt)
-    *)
+    val wf_env: forall 'p 'e 'k.
+     env 'p 'e 'k ->
+     bool
+    let ~{ocaml}wf_env e0 = (
+    (*Relation.isStrictTotalOrder (Relation.relFromPred {} {} e0.key_lt)*)
+      true
+    )
 
     val nat_env: env nat nat nat
     let nat_env =
@@ -204,7 +207,7 @@ module Fs_impl_types = struct
         maxN = 4;
         minN = 2;
         entry_to_key = (fun (Entry e) -> Key e);
-        key_lt = (fun (Key k1) (Key k2) -> k1 < k2);
+        key_lte = (fun (Key k1) (Key k2) -> k1 <= k2);
         free_page_id = (fun store -> match (Sorting.insertSortBy (fun (Page_id x) (Page_id y) -> y < x) (toList (Map.domain store))) with | (Page_id h)::_ -> (Page_id (h+1)) | [] -> (Page_id 0) end);
       |>
 
@@ -214,9 +217,7 @@ module Fs_impl_types = struct
       key 'k ->
       bool
     let key_lt env k1 k2 =
-      (env.key_lt k1 k2)
-      &&
-        (not(env.key_lt k2 k1))
+      (env.key_lte k1 k2)
       &&
         (not (k1 = k2))
 
@@ -226,7 +227,7 @@ module Fs_impl_types = struct
       key 'k ->
       bool
     let key_lte env k1 k2 =
-      key_lt env k1 k2 || k1 = k2
+      (env.key_lte k1 k2)
 
     val entry_lt : forall 'p 'e 'k.
       env 'p 'e 'k ->
