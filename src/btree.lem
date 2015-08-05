@@ -21,10 +21,10 @@ module Utility = struct
       nat ->
       nat ->
       set nat
-    let rec from_to_h i t = (
-      match t with
+    let rec from_to_h i j = (
+      match j with
       | 0 -> {i}
-      | _ -> {i} union (from_to_h (i+1) (t-1))
+      | _ -> {i+j} union (from_to_h i (j-1))
       end)
 
     val from_to :
@@ -33,7 +33,7 @@ module Utility = struct
       set nat
     let from_to i j = (
       if j < i then {}
-      else {j} union (from_to_h i (j-i))
+      else {j} union (from_to_h i ((j-1)-i))
     )
 
 
@@ -197,9 +197,8 @@ module Fs_impl_types = struct
      env 'p 'e 'k ->
      bool
     let ~{ocaml}wf_env e0 = (
-    (*Relation.isStrictTotalOrder (Relation.relFromPred {} {} e0.key_lt)*)
-      true
-    )
+    Relation.isTotalOrder (Relation.relFromPred {x|true} {x|true} e0.key_lte))
+
 
     val nat_env: env nat nat nat
     let nat_env =
@@ -341,13 +340,12 @@ module BTree = struct
 
     (* [ss] gets the set of entries for the ith page_id of qs *)
     val ss: forall 'p 'e 'k.
-      nat ->
-      list (page_id 'p) ->
+      maybe (page_id 'p) ->
       store 'p 'e 'k ->
       nat ->
       maybe (set (entry 'e))
-    let ss i qs s0 h = (
-      match qq i qs with
+    let ss qi s0 h = (
+      match qi with
       | Just qi -> (
         match norm_entries_list_h s0 qi h with
         | Just list -> Just (fromList (list))
@@ -358,12 +356,11 @@ module BTree = struct
 
     (* [mm] gets the number of data elements in the node referred by the ith page id of qs *)
     val mm: forall 'p 'e 'k.
-      nat ->
-      list (page_id 'p) ->
+      maybe (page_id 'p) ->
       store 'p 'e 'k ->
       maybe nat
-    let mm i qs s0 = (
-      match qq i qs with
+    let mm qi s0 = (
+      match qi with
       | Just qi -> get_m s0 qi
       | _ -> Nothing
       end)
@@ -392,7 +389,7 @@ module BTree = struct
     let cond_sj env n qs ds s0 h= (
       let js = from_to 1 (n-2) in
       let f3 j =
-        let sj' = ss (j+1) qs s0 h in
+        let sj' = ss (qq (j+1) qs) s0 h in
         let dj  = dd j ds    in
         let dj' = dd (j+1) ds in
         (match (sj',dj,dj') with
@@ -411,7 +408,7 @@ module BTree = struct
     let cond_mj env n qs s0 = (
       let js = from_to 1 n in
       let pred j =
-        (match mm j qs s0 with
+        (match mm (qq j qs) s0 with
          | Nothing -> false
          | Just mj -> env.minN <= mj
          end)
@@ -423,7 +420,7 @@ module BTree = struct
     smaller than all the node keys*)
     let cond_s1 env qs ds s0 h = (
       let d1 = dd 1 ds in
-      let s1 = ss 1 qs s0 h in
+      let s1 = ss (qq 1 qs) s0 h in
       (match (d1,s1) with
        | (Just d1,Just s1) ->
           Set.all (fun s -> key_lt env (env.entry_to_key s) d1 ) s1
@@ -434,7 +431,7 @@ module BTree = struct
     greater or equal than all the nodes keys *)
     let cond_sn env n qs ds s0 h = (
       let dn' = dd (n-1) ds in
-      let sn = ss n qs s0 h in
+      let sn = ss (qq n qs) s0 h in
       (match (dn',sn) with
        | (Just dn',Just sn) ->
           Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn
@@ -494,7 +491,7 @@ module BTree = struct
                   let n = n0 in
                   let rec_clause =
                     let pred i =
-                      let c = (qq i qs, ss i qs s0 h, mm i qs s0) in
+                      let c = (qq i qs, ss (qq i qs) s0 h, mm (qq i qs) s0) in
                       (match c with
                       | (Just qi, Just si, Just mi) -> (norm_wf_btree env s0 (qi,si,mi) h)
                       | _ -> false

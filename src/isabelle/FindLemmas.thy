@@ -26,7 +26,7 @@ apply (induct h)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt0 env k)")
+      apply (case_tac "first aa (key_lt env k)")
             apply (case_tac b)
               apply auto
 
@@ -49,7 +49,7 @@ apply (induct h)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt0 env k)")
+      apply (case_tac "first aa (key_lt env k)")
             apply (case_tac b)
               apply auto
 
@@ -137,7 +137,7 @@ apply (case_tac "n \<noteq> length ba")
         apply clarsimp
 
         apply clarsimp
-        apply (simp add:key_lte_def key_lt0_def norm_entries_list_h_simps)
+        apply (simp add:key_lte_def key_lt_def norm_entries_list_h_simps)
         apply rule
          apply clarsimp
          
@@ -171,7 +171,7 @@ apply (induct h, auto)
     apply (case_tac a)
       apply (case_tac inode)
       apply auto
-      apply (case_tac "first aa (key_lt0 env k)")
+      apply (case_tac "first aa (key_lt env k)")
         apply (case_tac b)
         apply (simp add:find_entry.simps norm_entries_list_h.simps)
 

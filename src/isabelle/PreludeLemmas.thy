@@ -73,7 +73,7 @@ apply (case_tac "a")
         apply auto
         apply (case_tac inode)
         apply auto
-        apply (case_tac " nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac " nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
        
         apply (case_tac lnode)
@@ -102,7 +102,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -137,7 +137,7 @@ apply (case_tac c)
       apply auto
       apply (case_tac inode)
       apply auto
-      apply (case_tac "nth_from_1 b (case first a (key_lt0 env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+      apply (case_tac "nth_from_1 b (case first a (key_lt env key) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
         apply auto
 
       apply (case_tac lnode)
@@ -228,7 +228,7 @@ apply (induct h)
         apply (case_tac aa)
           apply (case_tac inode)
           apply auto
-          apply (case_tac "first a (key_lt0 env key)")
+          apply (case_tac "first a (key_lt env key)")
             apply (simp add:nth_from_1_def)
             apply (case_tac b)
               apply auto
@@ -256,7 +256,7 @@ apply (induct h)
             apply (case_tac a)
               apply (case_tac inode)
               apply auto
-              apply (case_tac "first aa (key_lt0 env key)")
+              apply (case_tac "first aa (key_lt env key)")
               apply (simp add:nth_from_1_def)
               apply (case_tac b)
                 apply auto
@@ -297,7 +297,7 @@ apply (induct h)
       apply (case_tac a)
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first aa (key_lt0 env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
         apply (case_tac lnode)
@@ -312,7 +312,7 @@ apply (induct h)
       apply (case_tac a)
         apply (case_tac inode)
         apply auto
-        apply (case_tac "nth_from_1 b (case first aa (key_lt0 env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
+        apply (case_tac "nth_from_1 b (case first aa (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i)")
           apply auto
 
         apply (case_tac lnode)
@@ -360,7 +360,7 @@ apply (case_tac h)
         apply (case_tac a)
           apply (case_tac inode)
           apply auto
-          apply (case_tac "first aa (key_lt0 env key)")
+          apply (case_tac "first aa (key_lt env key)")
             apply (case_tac b)
               apply auto
 
@@ -648,20 +648,80 @@ apply clarsimp
 done
 
 lemma from_to_empty_iff [simp]:
-"from_to a b = [] \<longleftrightarrow> (a > b)"
+"from_to a b = {} \<longleftrightarrow> (a > b)"
 apply (case_tac "b - a")
  apply (simp add:from_to_def)+
 done
 
+lemma set_suc_equal_union_suc:
+"\<forall> i t . i \<le> Suc t \<longrightarrow> {n. i \<le> n \<and> n \<le> (Suc t)} =  {n. i \<le> n \<and> n \<le> t} \<union> {Suc t}"
+apply force
+done
+
 lemma from_to_set:
-"b > a \<longrightarrow> set (from_to a b) = {n. n \<ge> a \<and> n \<le> b} "
-sorry
-   
-  
-lemma nth_from1_bis [simp]:
-"b \<noteq> [] \<longrightarrow> (\<forall> j \<in> {n. n \<ge> Suc 0 \<and> n \<le> length b}. nth_from_1 b j = Some (b!(j-(1::nat))))"
+"a \<le> b \<longrightarrow> {n. a \<le> n \<and> n \<le> b} = (from_to a b)  "
+apply (simp add:from_to_def)
 apply clarsimp
-done 
+apply (induct b)
+ apply clarsimp
+
+ apply (simp add: set_suc_equal_union_suc)
+ apply (case_tac "b-a")
+  apply simp+
+  apply force
+
+  apply (subgoal_tac "a \<le> b")
+  defer
+   apply force
+  apply clarsimp
+  apply (subgoal_tac "b = Suc (a + nat)")
+  apply (case_tac nat)
+   apply simp+
+done  
+ 
+lemma nth_from1_bis [simp]:
+"b \<noteq> [] \<longrightarrow> (\<forall> j \<in> {n. Suc 0 \<le> n \<and> n \<le> length b}. nth_from_1 b j = Some (b!(j-(1::nat))))"
+apply clarsimp
+done
+
+lemma a_lemm:
+"\<forall> a list aa lista. 
+s r = Some (INode (I (a # list, aa # lista))) \<longrightarrow>
+norm_wf_btree env s (r, all_entries,n) (Suc h) \<longrightarrow>
+  (\<forall>i. Suc 0 \<le> i \<and> i \<le> Suc (length lista) \<longrightarrow>
+  (case (ss (Some ((aa # lista) ! (i - Suc 0))) s h) of None \<Rightarrow> False | Some l \<Rightarrow> True))"
+apply clarify
+sorry
+
+lemma norm_wf_btree_suc_n_then_norm_wf_btree_n:
+"s r = Some (INode(I(ds,qs))) \<longrightarrow>
+norm_wf_btree env s (r, all_entries,n) (Suc h) \<longrightarrow>
+  (\<forall> q \<in> set qs. norm_wf_btree env s (q, the (ss (Some q) s h), the (mm (Some q) s)) h)"
+apply clarsimp
+apply (case_tac "n \<noteq> length qs")
+ (* n \<noteq> length qs *)
+ apply simp
+
+ (* n = length qs *)
+ apply clarsimp
+ apply (case_tac "Suc (length ds) \<noteq> length qs")
+  (*Suc (length ds) \<noteq> length qs*)
+  apply simp
+
+  (* Suc (length ds) = length qs *)
+  apply clarsimp
+  apply (case_tac ds)
+   apply simp
+
+   apply (simp add:Let_def from_to_set qq_def ss.simps)
+   apply (case_tac qs)
+   apply clarsimp+
+
+   apply (simp add:a_lemm)
+   
+   
+   
+sorry
 
 lemma norm_entries_list_not_emtpy_if_wf_btree:
 "norm_wf_btree env s (r, all_entries,n) h \<longrightarrow>
@@ -721,6 +781,6 @@ apply (case_tac h)
         apply clarify
         apply (simp add:norm_entries_list_h_simps mm_def qq_def get_m_def)
         (* even proofing that there must be entries in a wf_btree of height 1 is hard *)
-                 
+        
 sorry
 end
