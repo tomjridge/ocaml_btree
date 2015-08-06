@@ -659,7 +659,7 @@ apply force
 done
 
 lemma from_to_set:
-"a \<le> b \<longrightarrow> {n. a \<le> n \<and> n \<le> b} = (from_to a b)  "
+"(from_to a b) = {n. a \<le> n \<and> n \<le> b}  "
 apply (simp add:from_to_def)
 apply clarsimp
 apply (induct b)
@@ -677,51 +677,94 @@ apply (induct b)
   apply (subgoal_tac "b = Suc (a + nat)")
   apply (case_tac nat)
    apply simp+
-done  
- 
+done
+
+lemma forall_elements_equal_forall_from_to_nth:
+"(\<forall> x \<in> set l. P x) = (\<forall> j \<in> from_to (Suc 0) (length l) . P(nth l (j - 1)))"
+apply (simp add:from_to_set)
+apply (induct l)
+ apply clarsimp+
+
+ apply auto
+ apply (case_tac "j=Suc 0")
+  apply simp+
+done
+
+lemma forall_elements_equal_forall_from_to_nth2:
+"(\<forall> j \<in> from_to (Suc 0) (length l) . P(nth l (j - 1))) = (\<forall> x \<in> set l. P x)" 
+apply (simp add:forall_elements_equal_forall_from_to_nth)
+done
+
 lemma nth_from1_bis [simp]:
 "b \<noteq> [] \<longrightarrow> (\<forall> j \<in> {n. Suc 0 \<le> n \<and> n \<le> length b}. nth_from_1 b j = Some (b!(j-(1::nat))))"
 apply clarsimp
 done
 
-lemma a_lemm:
-"\<forall> a list aa lista. 
-s r = Some (INode (I (a # list, aa # lista))) \<longrightarrow>
-norm_wf_btree env s (r, all_entries,n) (Suc h) \<longrightarrow>
-  (\<forall>i. Suc 0 \<le> i \<and> i \<le> Suc (length lista) \<longrightarrow>
-  (case (ss (Some ((aa # lista) ! (i - Suc 0))) s h) of None \<Rightarrow> False | Some l \<Rightarrow> True))"
-apply clarify
-sorry
+lemma resolve_ss_wf_btree:
+"(s r = Some (INode (I (a # list, qs))) \<longrightarrow> union_clause all_entries s r (Suc h) \<longrightarrow> (\<forall>i. Suc 0 \<le> i \<and> i \<le> (length qs) \<longrightarrow>
+  (ss (Some ((qs) ! (i - Suc 0))) s h = Some (the ( (case norm_entries_list_h s ((qs) ! (i - Suc 0)) h of None \<Rightarrow> None
+                   | Some list \<Rightarrow> Some (set list)))))))"
+   apply (simp add:union_clause_def ss.simps)
+   apply clarsimp
+   apply (case_tac "norm_entries_list_h s r (Suc h) ")
+   apply simp
+
+   apply (case_tac " norm_entries_list_h s ((qs) ! (i - Suc 0)) h \<noteq> None")
+    apply force
+
+    apply (simp add:norm_entries_list_h_simps)
+    apply (case_tac "\<not>((\<forall>x\<in>set qs. \<exists>y. norm_entries_list_h s x h = Some y))")
+     apply clarsimp
+
+     apply clarsimp
+     (* this is true because list ! index = \<forall> x in list*)
+     apply (simp add:forall_elements_equal_forall_from_to_nth from_to_set)
+     apply force
+done
+
+lemma resolve_mm_wf_btree:
+"cond_mj env (length qs) qs s \<longrightarrow> (\<forall>i. Suc 0 \<le> i \<and> i \<le> (length qs) \<longrightarrow> mm (Some ((qs) ! (i - Suc 0))) s = Some  (the(case s ((qs) ! (i - Suc 0)) of None \<Rightarrow> None | Some (INode (I (x, qs))) \<Rightarrow> Some (length qs)
+                 | Some (LNode (L es)) \<Rightarrow> Some (length es))))"
+apply (case_tac "qs = []")
+ apply simp
+   
+ apply (simp add:cond_mj_def from_to_set qq_def)
+ apply clarsimp
+ apply (case_tac " mm (Some (qs ! (i - Suc 0))) s")
+    apply force
+
+    apply (simp add:mm.simps get_m_def)
+done
 
 lemma norm_wf_btree_suc_n_then_norm_wf_btree_n:
 "s r = Some (INode(I(ds,qs))) \<longrightarrow>
 norm_wf_btree env s (r, all_entries,n) (Suc h) \<longrightarrow>
-  (\<forall> q \<in> set qs. norm_wf_btree env s (q, the (ss (Some q) s h), the (mm (Some q) s)) h)"
-apply clarsimp
+  (\<forall> i \<in> from_to 1 (length qs). norm_wf_btree env s (qs ! (i - Suc 0), the (ss (Some (qs ! (i - Suc 0))) s h), the (mm (Some (qs ! (i - Suc 0))) s)) h)"
+apply simp
 apply (case_tac "n \<noteq> length qs")
  (* n \<noteq> length qs *)
  apply simp
 
  (* n = length qs *)
- apply clarsimp
+ apply simp
  apply (case_tac "Suc (length ds) \<noteq> length qs")
   (*Suc (length ds) \<noteq> length qs*)
   apply simp
 
   (* Suc (length ds) = length qs *)
-  apply clarsimp
+  apply simp
   apply (case_tac ds)
    apply simp
 
    apply (simp add:Let_def from_to_set qq_def ss.simps)
-   apply (case_tac qs)
-   apply clarsimp+
-
-   apply (simp add:a_lemm)
+   apply (case_tac "qs = []")
+   apply simp+
+      
    
-   
-   
-sorry
+   apply (insert resolve_ss_wf_btree resolve_mm_wf_btree)
+   apply clarsimp
+   apply force
+done
 
 lemma norm_entries_list_not_emtpy_if_wf_btree:
 "norm_wf_btree env s (r, all_entries,n) h \<longrightarrow>

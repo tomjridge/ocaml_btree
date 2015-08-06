@@ -393,7 +393,7 @@ module BTree = struct
         let dj  = dd j ds    in
         let dj' = dd (j+1) ds in
         (match (sj',dj,dj') with
-         | (Just sj', Just dj, Just dj') -> (* this condition tells us only that the entries with index dj are key_lt and that dj is key lt of entries with index dj+1 (I cannot proof anything since key_lt does not have the transitivity property)*)
+         | (Just sj', Just dj, Just dj') ->
             Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
             &&
               Set.all (fun s -> key_lt env (env.entry_to_key s) dj') sj'
