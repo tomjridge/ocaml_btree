@@ -197,7 +197,9 @@ module Fs_impl_types = struct
      env 'p 'e 'k ->
      bool
     let ~{ocaml}wf_env e0 = (
-    Relation.isTotalOrder (Relation.relFromPred {x|true} {x|true} e0.key_lte))
+      e0.minN > 1 &&
+        e0.maxN > 1 &&
+    Relation.isTotalOrder (Relation.relFromPred {x| true} {x| true} e0.key_lte))
 
 
     val nat_env: env nat nat nat
