@@ -30,4 +30,6 @@ begin
 
 (*  termination delete_loop by lexicographic_order *)
 
+
+
 end

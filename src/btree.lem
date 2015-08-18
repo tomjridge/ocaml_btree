@@ -23,8 +23,8 @@ module Utility = struct
       set nat
     let rec from_to_h i j = (
       match j with
-      | 0 -> {i}
-      | _ -> {i+j} union (from_to_h i (j-1))
+      | 0 -> {}
+      | _ -> (from_to_h i (j-1)) union {i+(j-1)}
       end)
 
     val from_to :
@@ -33,7 +33,7 @@ module Utility = struct
       set nat
     let from_to i j = (
       if j < i then {}
-      else {j} union (from_to_h i ((j-1)-i))
+      else (from_to_h i (1+(j-i)))
     )
 
 
@@ -43,10 +43,9 @@ module Utility = struct
        ('a -> bool) ->
        maybe nat
     let first xs p = (
-      let is = List.findIndices p xs in
-      match is with
-      | [] -> Nothing
-      | i::_ -> Just(i+1)
+      match (List.findIndex p xs) with
+      | Nothing -> Nothing
+      | Just i  -> Just(i+1)
       end)
 
     (* it checks that predicate [p] on the [k]th element of [xs] *)

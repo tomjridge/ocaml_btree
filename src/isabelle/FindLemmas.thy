@@ -280,18 +280,146 @@ apply (induct h, auto)
 (* THIS IS THE LNODE CASE, uncomment after INODE CASE is solved
       
 *) 
-sorry
+oops
+
+lemma norm_find_entry_equal_to_map_lookup [simp]:
+"\<forall> (* env k s *) r .
+(
+wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h \<longrightarrow> 
+find_entry (norm_find_h env (Some(Find k),r,s) h) = 
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> [])) k))"
+apply rule
+apply (induct h)
+ (* 0 *)
+ apply (case_tac "s r")
+  apply simp
+
+  (* s r = Some a *)
+  apply simp
+  apply (case_tac a)
+   apply simp
+
+   (* a = lnode *)
+   apply (case_tac lnode)
+   apply (simp add:Let_def mm.simps get_m_def)
+   apply (case_tac "length list > maxN env")
+    apply simp
+
+    (* length list \<le> maxN env *)
+    apply (simp add:norm_find_h.simps find_trans_def ss.simps norm_entries_list_h.simps)
+    apply (case_tac "first list (\<lambda>x. k = entry_to_key env x)")
+      apply (simp add:find_entry.simps norm_entries_list_h.simps map_and_first_are_equal)
+
+      apply (simp add:find_entry.simps norm_entries_list_h.simps map_and_first_are_equal)
+
+ (* Suc h *)
+ apply (case_tac "s r")
+  apply simp
+
+  (* s r = Some a *)
+  apply (case_tac a)
+  defer
+   apply simp
+
+   apply (case_tac "inode")
+   apply (case_tac prod)
+   apply (simp add:Let_def del:norm_wf_btree.simps)
+   apply (simp add:mm.simps get_m_def)
+   apply (case_tac "Suc (length aa) \<noteq> length b")
+    apply simp
+
+    (*Suc (length aa) = length b*)
+    apply simp
+    apply (case_tac aa)
+     apply simp
+
+     (* aa = ab # list *) 
+     apply (case_tac "b = []")
+      apply simp
+      
+      (* b \<noteq> [] *)
+      apply (simp add:Let_def norm_find_h_simps find_trans_def map_and_listfind_equal)
+      (* we set the induction hypothesis we are going to use soon *)
+      apply (subgoal_tac "s r = Some (INode(I(aa,b))) \<Longrightarrow>
+        norm_wf_btree env s (r, the (ss (Some r) s (Suc h)), the (mm (Some r) s)) (Suc h) \<longrightarrow>
+        (\<forall> i \<in> from_to (Suc 0) (length b). norm_wf_btree env s (b ! (i - Suc 0), the (ss (Some (b ! (i - Suc 0))) s h), the (mm (Some (b ! (i - Suc 0))) s)) h)")
+      defer
+       apply (simp add:norm_wf_btree_suc_n_then_norm_wf_btree_n)
+       
+      (*let's generalise and avoid the case split on first (ab#list) (key_lt env k) *)
+      apply (subgoal_tac "\<exists>n. (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n")
+      defer
+       apply (simp add:first_def)
+
+      apply (erule exE)
+      apply (subgoal_tac "(case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n \<longrightarrow> \<not> ((ab # list) = []) \<and> \<not>(n = 0) \<and> (n \<le> Suc (length (ab # list)))")
+        defer
+         apply (simp add:first_def find_index_def)
+          apply (case_tac "key_lt env k ab")
+           apply simp+
+
+           apply (case_tac "map Suc (find_indices (key_lt env k) list) ")
+           apply simp
+           
+           apply clarsimp
+            apply (force intro:sorry_fixme) (* FIXME: I think that the substitution of Suc length ab#list with length b does not allow the simplification with the lemma first_returns_something_only_if*)
+        apply simp
+        apply (case_tac "nth_from_1 b n")
+         (* nth_from_1 ba ac = None *)
+         (* this case is impossible because we know 
+         Suc (Suc (length list)) = length ba
+         and it cannot be that
+         length ba < ac
+         because ac is an index of ab#list
+         *)
+         apply simp
+
+      apply (simp add:nth_from_1_def)
+      apply (case_tac "n")
+       apply simp+
+
+       apply (simp add:norm_entries_list_h_simps map_and_listfind_equal)
+       (* we set the case in which norm_entries_list h = None as another subgoal *)
+       apply rule
+        apply (subgoal_tac "\<forall>i\<in>from_to (Suc 0) (length b).
+           norm_wf_btree env s (b ! (i - Suc 0), the (ss (Some (b ! (i - Suc 0))) s h), the (mm (Some (b ! (i - Suc 0))) s)) h \<Longrightarrow>
+           norm_wf_btree env s (b ! (n - Suc 0), the (ss (Some (b ! (n - Suc 0))) s h), the (mm (Some (b ! (n - Suc 0))) s)) h")
+       apply (simp add: mm.simps get_m_def)
+       apply (subgoal_tac "wf_env env \<Longrightarrow>
+           s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
+           cond_sj env (length b) b (ab # list) s h \<and>
+           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
+          (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc nat \<Longrightarrow>
+           ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+           =
+           (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))")
+        apply simp
+
+         apply (force intro:sorry_fixme) (* FIXME *)
+         
+         (*subgoal: ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+           =
+           (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(length b - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))")*)
+         apply (simp add:from_to_set)
+         apply force
+        (* (\<exists>x\<in>set ba. norm_entries_list_h s x h = None)*)
+        (* this should falsify wf_btree, because no norm_entries_list_h call is allowed to return false *)
+        apply (simp add:union_clause_def norm_entries_list_h_simps)
+        apply force
+done
 
 lemma find_entry_equal_to_map_lookup:
-"\<forall> env k c s r .
-let all_entries = (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> []) in
+"
+(
+wf_env env \<longrightarrow> wf_btree env s (r,the(ss (Some r) s (h-(1::nat))),the(mm (Some r) s)) h \<longrightarrow> 
 find_entry (find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) all_entries) k)"
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> [])) k))
+"
 apply (case_tac h)
 apply (simp add:find_h_def find_entry.simps entries_list_h.simps first_def)
 
 
-apply (simp add:find_h_def  entries_list_h.simps)
+apply (simp add:wf_btree_def find_h_def  entries_list_h.simps )
 done
 
 

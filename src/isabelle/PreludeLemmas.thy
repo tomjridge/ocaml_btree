@@ -30,16 +30,17 @@ done
 lemma first_returns_something_only_if [simp]:
 "\<forall> p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
 apply auto
-apply (simp add:first_def)
+apply (simp add:first_def find_index_def)
 
 apply (simp add:first_def)
-apply (case_tac "find_indices p xs")
+apply (case_tac "find_index p xs")
 apply auto
 
 apply (simp add:first_def)
-apply (case_tac "find_indices p xs")
+apply (case_tac "find_index p xs")
   apply auto
 done
+
 
 lemma nth_from_1_is_like_nth [simp]:
 "\<forall> list n. (nth_from_1 list 0 = None) \<and> (nth_from_1 list (Suc n) = index list n) "
@@ -445,25 +446,23 @@ map_of (map (\<lambda>e. (entry_to_key env e, e)) list) k =
 apply auto
 apply (induct list)
   (* list = [] *)
-  apply (simp add:first_def)
+  apply (simp add:first_def find_index_def)
 
   (* list = a#list *)
-  apply (simp add:first_def)
-  apply auto
-  
-    apply (case_tac "map Suc (find_indices (\<lambda>x. k = entry_to_key env x) list)")
-      apply auto
+  apply (simp add:first_def find_index_def)  
+  apply (case_tac "map Suc (find_indices (\<lambda>x. k = entry_to_key env x) list)")
+   apply auto
 done
 
 lemma nth_first_is_list_find_simp:
 "\<forall> p. List.find p list = nth_from_1 list (case first list p of None \<Rightarrow> 0 | Some i \<Rightarrow> i) "
 apply (induct list)
-  apply (simp add:nth_from_1_def first_def)
+  apply (simp add:nth_from_1_def first_def find_index_def)
 
   apply auto
-  apply (simp add:first_def)
+  apply (simp add:first_def find_index_def)
 
-  apply (simp add:first_def)
+  apply (simp add:first_def find_index_def)
   apply (case_tac "find_indices p list ")
     apply auto
 done
@@ -658,26 +657,29 @@ lemma set_suc_equal_union_suc:
 apply force
 done
 
-lemma from_to_set:
-"(from_to a b) = {n. a \<le> n \<and> n \<le> b}  "
-apply (simp add:from_to_def)
-apply clarsimp
-apply (induct b)
- apply clarsimp
+lemma from_to_set_h:
+"(from_to a (a+b)) = {n. a \<le> n \<and> n \<le> (a+b)}  "
+apply(induct b)
+apply(simp add:from_to_def)
+apply(force)
 
- apply (simp add: set_suc_equal_union_suc)
- apply (case_tac "b-a")
-  apply simp+
-  apply force
-
-  apply (subgoal_tac "a \<le> b")
-  defer
-   apply force
-  apply clarsimp
-  apply (subgoal_tac "b = Suc (a + nat)")
-  apply (case_tac nat)
-   apply simp+
+apply(simp)
+apply(simp add: from_to_def)
+apply(force)
 done
+
+lemma from_to_set:
+"(from_to a c) = {n. a \<le> n \<and> n \<le> c}  "
+apply (case_tac "c < a")
+ apply (simp add:from_to_def)
+
+ apply (case_tac "\<exists>b. c = a+b")
+  apply clarify
+  apply (simp add:from_to_set_h)
+
+  apply arith
+done
+
 
 lemma forall_elements_equal_forall_from_to_nth:
 "(\<forall> x \<in> set l. P x) = (\<forall> j \<in> from_to (Suc 0) (length l) . P(nth l (j - 1)))"
@@ -701,7 +703,8 @@ apply clarsimp
 done
 
 lemma resolve_ss_wf_btree:
-"(s r = Some (INode (I (a # list, qs))) \<longrightarrow> union_clause all_entries s r (Suc h) \<longrightarrow> (\<forall>i. Suc 0 \<le> i \<and> i \<le> (length qs) \<longrightarrow>
+"(
+s r = Some (INode (I (a # list, qs))) \<longrightarrow> union_clause all_entries s r (Suc h) \<longrightarrow> (\<forall>i. Suc 0 \<le> i \<and> i \<le> length qs \<longrightarrow>
   (ss (Some ((qs) ! (i - Suc 0))) s h = Some (the ( (case norm_entries_list_h s ((qs) ! (i - Suc 0)) h of None \<Rightarrow> None
                    | Some list \<Rightarrow> Some (set list)))))))"
    apply (simp add:union_clause_def ss.simps)
@@ -722,6 +725,32 @@ lemma resolve_ss_wf_btree:
      apply force
 done
 
+lemma resolve_ss_wf_btree_m_2:
+"
+s r = Some (INode (I (ab # list, b))) \<longrightarrow> union_clause (the (case norm_entries_list_h s r h of None \<Rightarrow> None | Some list \<Rightarrow> Some (set list))) s r (Suc h) \<longrightarrow> (\<forall>j. Suc 0 \<le> j \<and> j \<le> length b - 2 \<longrightarrow>
+  (ss (index b j) s h = Some (the ( (case norm_entries_list_h s (the(index b j)) h of None \<Rightarrow> None
+                   | Some list \<Rightarrow> Some (set list))))))"
+
+(*   apply (simp add:union_clause_def ss.simps)
+   apply clarsimp
+   apply (case_tac "norm_entries_list_h s r (Suc h) ")
+   apply simp
+
+   apply (case_tac " norm_entries_list_h s ((qs) ! (i - Suc 0)) h \<noteq> None")
+    apply force
+
+    apply (simp add:norm_entries_list_h_simps)
+    apply (case_tac "\<not>((\<forall>x\<in>set qs. \<exists>y. norm_entries_list_h s x h = Some y))")
+     apply clarsimp
+
+     apply clarsimp
+     (* this is true because list ! index = \<forall> x in list*)
+     apply (simp add:forall_elements_equal_forall_from_to_nth from_to_set)
+     apply force*)
+apply (force intro:sorry_fixme)
+done
+
+
 lemma resolve_mm_wf_btree:
 "cond_mj env (length qs) qs s \<longrightarrow> (\<forall>i. Suc 0 \<le> i \<and> i \<le> (length qs) \<longrightarrow> mm (Some ((qs) ! (i - Suc 0))) s = Some  (the(case s ((qs) ! (i - Suc 0)) of None \<Rightarrow> None | Some (INode (I (x, qs))) \<Rightarrow> Some (length qs)
                  | Some (LNode (L es)) \<Rightarrow> Some (length es))))"
@@ -737,9 +766,9 @@ apply (case_tac "qs = []")
 done
 
 lemma norm_wf_btree_suc_n_then_norm_wf_btree_n:
-"s r = Some (INode(I(ds,qs))) \<longrightarrow>
+"s r = Some (INode(I(ds,qs))) \<Longrightarrow>
 norm_wf_btree env s (r, all_entries,n) (Suc h) \<longrightarrow>
-  (\<forall> i \<in> from_to 1 (length qs). norm_wf_btree env s (qs ! (i - Suc 0), the (ss (Some (qs ! (i - Suc 0))) s h), the (mm (Some (qs ! (i - Suc 0))) s)) h)"
+  (\<forall> i \<in> from_to (Suc 0) (length qs). norm_wf_btree env s (qs ! (i - Suc 0), the (ss (Some (qs ! (i - Suc 0))) s h), the (mm (Some (qs ! (i - Suc 0))) s)) h)"
 apply simp
 apply (case_tac "n \<noteq> length qs")
  (* n \<noteq> length qs *)
@@ -758,72 +787,202 @@ apply (case_tac "n \<noteq> length qs")
 
    apply (simp add:Let_def from_to_set qq_def ss.simps)
    apply (case_tac "qs = []")
-   apply simp+
-      
+   apply simp+     
    
-   apply (insert resolve_ss_wf_btree resolve_mm_wf_btree)
-   apply clarsimp
-   apply force
+   apply(rule)+
+   apply (erule conjE)+
+   apply (simp add:resolve_ss_wf_btree resolve_mm_wf_btree)
 done
 
+lemma sorted_by_e_lt_allDistinct:
+"wf_env env \<longrightarrow> sorted_by (entry_lt env) list \<longrightarrow> allDistinct (map (entry_to_key env) list)"
+sorry
+
+lemma wf_env_wf_btree_no_entry_with_same_key:
+"wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h \<longrightarrow> (\<exists> list.
+norm_entries_list_h s r h = Some list \<and> allDistinct (map (entry_to_key env) list))"
+apply rule
+apply (induct h)
+ apply (case_tac "s r")
+  apply simp
+
+  apply (case_tac a)
+   apply simp
+
+   apply (case_tac lnode)
+   apply (simp add:Let_def mm.simps get_m_def)
+   apply (case_tac "\<not>(length list \<le> maxN env)")
+    apply simp
+
+    apply (simp add:ss.simps norm_entries_list_h.simps wf_env_def sorted_by_e_lt_allDistinct)
+    
+ (* Suc n *)
+ apply (case_tac "s r")
+  apply simp
+  
+  apply (case_tac a)
+  apply (simp_all)
+   apply (case_tac inode)
+   apply (case_tac prod)
+   apply (simp add:mm.simps get_m_def)
+   apply (case_tac "Suc (length aa) \<noteq> length b")
+    apply simp
+
+    apply (case_tac aa)
+     apply simp
+
+     apply (simp add:Let_def union_clause_def)
+     apply (case_tac "norm_entries_list_h s r (Suc nat)")
+      apply simp
+    
+      apply simp
+   
+sorry
+
+lemma "list \<noteq> [] \<longrightarrow> allDistinct (map (entry_to_key env) (List.concat list)) \<longrightarrow> 
+(\<exists> l \<in> set list . List.find (\<lambda> k'. k = entry_to_key env k') (List.concat list) = 
+List.find (\<lambda> k'. k = entry_to_key env k') l)"
+apply (case_tac list)
+ apply simp+
+
+ apply (simp add:Let_def)
+ apply clarsimp                        
+oops
+ 
+lemma listfind_Suc_h_eq_listfind_h_if_ordered_keys:
+"wf_env env \<Longrightarrow>
+ s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
+ norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) (Suc h) \<Longrightarrow>
+ first (ab # list) (key_lt env k) = None \<Longrightarrow>
+ ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+ =
+ (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(length b - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))"
+apply (simp add:mm.simps get_m_def)
+apply (case_tac "Suc (Suc (length list)) ~= length b")
+ apply simp
+
+ apply (case_tac "b = []")
+  apply simp
+
+  apply (simp add:Let_def)
+  apply (erule conjE)+
+  apply (simp add:cond_sn_def)
+  apply (case_tac "dd (length b - Suc 0) (ab # list)")
+   apply simp
+
+   apply (simp add:qq_def ss.simps)
+   apply (case_tac "norm_entries_list_h s (b ! (length b - Suc 0)) h")
+    apply simp
+
+    apply (simp add:key_lte0_def)
+    
+  apply (simp add:cond_sj_def qq_def from_to_set)
+   apply (subgoal_tac "s r = Some (INode (I (ab # list, b))) \<longrightarrow> union_clause (the (case norm_entries_list_h s r h of None \<Rightarrow> None | Some list \<Rightarrow> Some (set list))) s r (Suc h) \<longrightarrow> (\<forall>j. Suc 0 \<le> j \<and> j \<le> length b - 2 \<longrightarrow>
+  (ss (index b j) s h = Some (the ( (case norm_entries_list_h s (the(index b j)) h of None \<Rightarrow> None
+                   | Some list \<Rightarrow> Some (set list))))))")
+   apply (simp add:ss.simps qq_def dd_def)
+   
+     
+oops
+
 lemma norm_entries_list_not_emtpy_if_wf_btree:
-"norm_wf_btree env s (r, all_entries,n) h \<longrightarrow>
+"wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h  \<longrightarrow>
 (h = 0 \<and> (case s r of Some (LNode (L (qs))) \<Rightarrow> (norm_entries_list_h s r h = Some qs) | _ \<Rightarrow> False))
 \<or>
 (h > 0 \<and> (case norm_entries_list_h s r h of Some list \<Rightarrow> list \<noteq> [] | None \<Rightarrow> False)) "
 apply (case_tac h)
  apply (case_tac "s r")
   apply simp
-
+  
   apply (case_tac a)
    apply simp
-   
+
    apply (case_tac lnode)
-   apply (simp add:Let_def)
-   apply (case_tac "length list ~= n")
+   apply (simp add:mm.simps get_m_def Let_def)
+   apply (case_tac "length list > maxN env")
     apply simp
 
-    apply (case_tac "length list > maxN env")
-     apply simp
-     
-     apply simp
-     apply (case_tac "all_entries ~= set list")
-      apply simp
-
-      apply (simp add:norm_entries_list_h.simps)
- (* h = Suc nat*)
- apply clarsimp
+    apply (simp add:ss.simps norm_entries_list_h.simps)
+ (* Suc nat *)
  apply (case_tac "s r")
   apply simp
-  
+
   apply (case_tac a)
   defer
+   apply simp
+
+   (* a Inode *)
+   apply (case_tac inode)
+   apply (case_tac prod)
+   apply (simp add:mm.simps get_m_def)
+   apply (case_tac "Suc (length aa) \<noteq> length b")
+   apply simp
+
+   apply (case_tac aa)
+    apply simp
+
+    apply (case_tac "b = []")
+     apply simp
+    
+     apply (simp add:Let_def cond_mj_def from_to_set qq_def wf_env_def mm.simps get_m_def)
+     apply auto
+     
+sorry
+
+lemma norm_entries_list_cannot_be_None_if_norm_wf_btree_hgt0:
+"norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h \<longrightarrow> norm_entries_list_h s r h \<noteq> None"
+apply (case_tac h)
+ (* h = 0 *)
+ apply simp
+ apply (case_tac "s r")
+  (* s r = None *)
   apply simp
-  
-  apply (case_tac inode)
-  apply clarsimp
-  apply (case_tac "Suc (length aa) \<noteq> length b")
-    (* Suc (length aa) ~= length b*)
-    apply clarsimp
-     apply (case_tac "n \<noteq> length b")
+
+  apply (case_tac a)
+   (* a = Inode *)
+   apply simp
+
+   (* a = Lnode *)
+   apply (case_tac lnode)
+   apply (simp add:Let_def mm.simps get_m_def)
+   apply (case_tac "\<not>(length list \<le> maxN env)")
+    (* \<not>(length list \<le> maxN env) *)
+    apply simp
+
+    (* (length list \<le> maxN env)*)
+    apply (simp add:ss.simps norm_entries_list_h.simps wf_env_def sorted_by_e_lt_allDistinct)
+
+ (* h = Suc *)
+ apply simp
+ apply (case_tac "s r")
+  (* s r = None *)
+  apply simp
+
+  (* s r = Some a *)
+  apply (case_tac a)
+   (* a = Inode *)
+   apply (case_tac inode)
+   apply (case_tac prod)
+   apply (simp add:mm.simps get_m_def)
+   apply (case_tac "Suc (length aa) \<noteq> length b")
+    (* Suc (length aa) \<noteq> length b *)
+    apply simp
+
+    (* Suc (length aa) = length b *)
+    apply (case_tac aa)
+     (* aa = [] *)
+     apply simp
+
+     (* aa = ab#list *)
+     apply (simp add:Let_def union_clause_def)
+     apply (case_tac "norm_entries_list_h s r (Suc nat)")
+      (* norm_entries_list_h s r (Suc nat) = None *)
+      apply simp
+      
+      (* norm_entries_list_h s r (Suc nat) *)
       apply simp
 
-      apply clarsimp
-      apply (case_tac "aa")
-       apply clarsimp
-
-       apply clarsimp
-       apply (simp add:union_clause_def)
-       apply (case_tac "norm_entries_list_h s r (Suc nat)")
-        apply simp+
-
-        apply clarsimp
-        apply (case_tac "b=[]")
-        apply clarsimp+
-        apply (simp add:Let_def cond_mj_def from_to_set get_m_def ss_def qq_def)
-        apply clarify
-        apply (simp add:norm_entries_list_h_simps mm_def qq_def get_m_def)
-        (* even proofing that there must be entries in a wf_btree of height 1 is hard *)
-        
-sorry
+   (* a = lnode *)
+   apply simp
+done
 end
