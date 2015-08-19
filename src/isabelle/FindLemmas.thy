@@ -361,8 +361,12 @@ apply (induct h)
            apply (case_tac "map Suc (find_indices (key_lt env k) list) ")
            apply simp
            
-           apply clarsimp
-            apply (force intro:sorry_fixme) (* FIXME: I think that the substitution of Suc length ab#list with length b does not allow the simplification with the lemma first_returns_something_only_if*)
+           apply simp
+           apply (subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b")
+           apply force
+           (* subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b" *)
+            apply simp
+
         apply simp
         apply (case_tac "nth_from_1 b n")
          (* nth_from_1 ba ac = None *)
