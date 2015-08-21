@@ -282,12 +282,12 @@ apply (induct h, auto)
 *) 
 oops
 
-lemma norm_find_entry_equal_to_map_lookup [simp]:
+lemma norm_find_entry_equal_to_map_lookup:
 "\<forall> (* env k s *) r .
 (
 wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h \<longrightarrow> 
 find_entry (norm_find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> [])) k))"
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (norm_entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> fail)) k))"
 apply rule
 apply (induct h)
  (* 0 *)
@@ -319,8 +319,10 @@ apply (induct h)
   (* s r = Some a *)
   apply (case_tac a)
   defer
+   (* a = LNode *)
    apply simp
 
+   (* a = INode*)
    apply (case_tac "inode")
    apply (case_tac prod)
    apply (simp add:Let_def del:norm_wf_btree.simps)
@@ -344,72 +346,63 @@ apply (induct h)
         norm_wf_btree env s (r, the (ss (Some r) s (Suc h)), the (mm (Some r) s)) (Suc h) \<longrightarrow>
         (\<forall> i \<in> from_to (Suc 0) (length b). norm_wf_btree env s (b ! (i - Suc 0), the (ss (Some (b ! (i - Suc 0))) s h), the (mm (Some (b ! (i - Suc 0))) s)) h)")
       defer
+       (* we solve the subgoal norm_wf_btree Suc h = norm_wf_btree h*)
        apply (simp add:norm_wf_btree_suc_n_then_norm_wf_btree_n)
        
       (*let's generalise and avoid the case split on first (ab#list) (key_lt env k) *)
       apply (subgoal_tac "\<exists>n. (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n")
       defer
+       (* subgoal_tac "\<exists>n. (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n *)
        apply (simp add:first_def)
 
       apply (erule exE)
       apply (subgoal_tac "(case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n \<longrightarrow> \<not> ((ab # list) = []) \<and> \<not>(n = 0) \<and> (n \<le> Suc (length (ab # list)))")
-        defer
-         apply (simp add:first_def find_index_def)
-          apply (case_tac "key_lt env k ab")
-           apply simp+
+       defer
+       (* subgoal_tac "(case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = n \<longrightarrow> \<not> ((ab # list) = []) \<and> \<not>(n = 0) \<and> (n \<le> Suc (length (ab # list))) *)
+       apply (simp add:first_def find_index_def)
+       apply (case_tac "key_lt env k ab")
+        apply simp+
 
-           apply (case_tac "map Suc (find_indices (key_lt env k) list) ")
-           apply simp
-           
-           apply simp
-           apply (subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b")
-           apply force
-           (* subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b" *)
-            apply simp
-
-        apply simp
-        apply (case_tac "nth_from_1 b n")
-         (* nth_from_1 ba ac = None *)
-         (* this case is impossible because we know 
-         Suc (Suc (length list)) = length ba
-         and it cannot be that
-         length ba < ac
-         because ac is an index of ab#list
-         *)
+        apply (case_tac "map Suc (find_indices (key_lt env k) list) ")
          apply simp
+           
+         apply simp
+         apply (subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b")
+         apply force
+          (* subgoal_tac "\<forall>x \<in> set (find_indices (key_lt env k) list). Suc x \<le> length list \<and> length list < length b" *)
+          apply simp
+      (* we proved the generalisation, we can proceed with the main proof*)
 
-      apply (simp add:nth_from_1_def)
-      apply (case_tac "n")
-       apply simp+
+      apply simp
+      apply (case_tac "nth_from_1 b n")
+       apply simp
 
-       apply (simp add:norm_entries_list_h_simps map_and_listfind_equal)
-       (* we set the case in which norm_entries_list h = None as another subgoal *)
-       apply rule
-        apply (subgoal_tac "\<forall>i\<in>from_to (Suc 0) (length b).
+       (* nth_from_1 b n = Some ac *)
+       apply (simp add:nth_from_1_def)
+       apply (case_tac "n")
+         apply simp+
+
+         (* n = Suc nat *)
+         apply (simp add:norm_entries_list_h_simps map_and_listfind_equal)
+         (* we set the case in which norm_entries_list h = None as another subgoal *)
+         apply rule
+          apply (subgoal_tac "\<forall>i\<in>from_to (Suc 0) (length b).
            norm_wf_btree env s (b ! (i - Suc 0), the (ss (Some (b ! (i - Suc 0))) s h), the (mm (Some (b ! (i - Suc 0))) s)) h \<Longrightarrow>
            norm_wf_btree env s (b ! (n - Suc 0), the (ss (Some (b ! (n - Suc 0))) s h), the (mm (Some (b ! (n - Suc 0))) s)) h")
-       apply (simp add: mm.simps get_m_def)
-       apply (subgoal_tac "wf_env env \<Longrightarrow>
-           s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
-           cond_sj env (length b) b (ab # list) s h \<and>
-           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
-          (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc nat \<Longrightarrow>
-           ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
-           =
-           (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))")
-        apply simp
+          apply (simp add: mm.simps get_m_def)
+          apply (simp add:listfind_Suc_h_eq_listfind_h_if_ordered_keys)
+          (* main goal solved *)
 
-         apply (force intro:sorry_fixme) (* FIXME *)
-         
-         (*subgoal: ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+            (*subgoal: ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
            =
            (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(length b - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))")*)
-         apply (simp add:from_to_set)
-         apply force
-        (* (\<exists>x\<in>set ba. norm_entries_list_h s x h = None)*)
-        (* this should falsify wf_btree, because no norm_entries_list_h call is allowed to return false *)
-        apply (simp add:union_clause_def norm_entries_list_h_simps)
-        apply force
+           apply (simp add:from_to_set)
+           apply force
+        
+           (* (\<exists>x\<in>set ba. norm_entries_list_h s x h = None)*)
+           (* this should falsify wf_btree, because no norm_entries_list_h call is allowed to return false *)
+           apply (simp add:union_clause_def norm_entries_list_h_simps)
+           apply force
 done
 
 lemma find_entry_equal_to_map_lookup:
@@ -417,13 +410,12 @@ lemma find_entry_equal_to_map_lookup:
 (
 wf_env env \<longrightarrow> wf_btree env s (r,the(ss (Some r) s (h-(1::nat))),the(mm (Some r) s)) h \<longrightarrow> 
 find_entry (find_h env (Some(Find k),r,s) h) = 
-(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> [])) k))
+(map_of (map (\<lambda> e . (entry_to_key env e,e)) (case (entries_list_h s r h) of (Some list) \<Rightarrow> list | None \<Rightarrow> fail)) k))
 "
 apply (case_tac h)
-apply (simp add:find_h_def find_entry.simps entries_list_h.simps first_def)
+apply (simp add:find_h_def find_entry.simps entries_list_h.simps first_def wf_btree_def)
 
-
-apply (simp add:wf_btree_def find_h_def  entries_list_h.simps )
+apply (simp add:wf_btree_def find_h_def  entries_list_h.simps norm_find_entry_equal_to_map_lookup)
 done
 
 

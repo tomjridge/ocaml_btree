@@ -794,9 +794,45 @@ apply (case_tac "n \<noteq> length qs")
    apply (simp add:resolve_ss_wf_btree resolve_mm_wf_btree)
 done
 
+lemma key_lt_transitivity:
+"wf_env env \<Longrightarrow>
+  key_lt env k k1 \<Longrightarrow>
+  key_lt env k1 k2 \<Longrightarrow>
+  key_lt env k k2"
+apply (simp add:key_lt_def wf_env_def relFromPred_def isTotalOrder_def isPartialOrder_def trans_def antisym_def total_on_def)
+apply blast
+done
+
+lemma sorted_by_entry_lt_Cons: 
+"wf_env env \<longrightarrow> sorted_by (entry_lt env) (x#xs) = (sorted_by (entry_lt env) xs & (ALL y:set xs.  entry_lt env x y))"
+apply(induct xs arbitrary: x) 
+ apply simp
+
+ apply (simp add:entry_lt_def order_trans)
+ apply auto
+
+ apply (simp add:key_lt_transitivity)
+done
+
+lemma sorted_by_entry_lt_append:
+  "wf_env env \<longrightarrow> sorted_by (entry_lt env) (xs@ys) = (sorted_by (entry_lt env) xs & sorted_by (entry_lt env) ys & (\<forall>x \<in> set xs. \<forall>y \<in> set ys. entry_lt env x y))"
+apply (induct xs)
+ apply simp
+
+ apply (simp add:sorted_by_entry_lt_Cons)
+ apply blast
+done
+
 lemma sorted_by_e_lt_allDistinct:
 "wf_env env \<longrightarrow> sorted_by (entry_lt env) list \<longrightarrow> allDistinct (map (entry_to_key env) list)"
-sorry
+apply (induct list)
+ apply (simp add:allDistinct.simps)
+
+ apply (simp add:allDistinct.simps sorted_by_entry_lt_Cons)
+ apply auto
+ apply (simp add: entry_lt_def key_lt_def)
+ apply blast
+done
 
 lemma wf_env_wf_btree_no_entry_with_same_key:
 "wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h \<longrightarrow> (\<exists> list.
@@ -848,42 +884,53 @@ apply (case_tac list)
  apply (simp add:Let_def)
  apply clarsimp                        
 oops
- 
+
+
+lemma bla :
+"wf_env env \<Longrightarrow>
+ s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
+ cond_sj env (length b) b (ab # list) s h \<and>
+           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
+(case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc na
+  \<Longrightarrow>
+  (\<forall> x \<in> {x. x < Suc na}.  \<not> (k \<in> (set( map (entry_to_key env) (case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) ))))
+  \<and>
+  (\<forall> x \<in> {x.  Suc na < x \<and> x < length b}.  \<not> (k \<in> (set( map (entry_to_key env) (case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) ))))
+  "
+(*not sure that wf_btree conditions on keys are the only one we are interested in *)
+apply (subgoal_tac "\<forall> n . norm_entries_list_h s (b!(n - Suc 0)) h \<noteq> None")
+defer
+ apply (force intro:sorry_fixme) (* this can be shown with a bit of effort from the cond assumptions *)
+apply (case_tac h)
+ apply (simp add:norm_entries_list_h.simps)
+ apply (case_tac "s (b ! (n - Suc 0))")
+  apply simp
+oops
 lemma listfind_Suc_h_eq_listfind_h_if_ordered_keys:
 "wf_env env \<Longrightarrow>
  s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
- norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) (Suc h) \<Longrightarrow>
- first (ab # list) (key_lt env k) = None \<Longrightarrow>
+ b \<noteq> [] \<Longrightarrow>
+ n = Suc na \<Longrightarrow>
+ cond_sj env (length b) b (ab # list) s h \<and>
+           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
+ (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc na \<Longrightarrow>
  ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
  =
- (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(length b - Suc 0)) h) of None \<Rightarrow> [] | Some list \<Rightarrow> list) )))"
-apply (simp add:mm.simps get_m_def)
-apply (case_tac "Suc (Suc (length list)) ~= length b")
- apply simp
-
- apply (case_tac "b = []")
-  apply simp
-
-  apply (simp add:Let_def)
-  apply (erule conjE)+
-  apply (simp add:cond_sn_def)
-  apply (case_tac "dd (length b - Suc 0) (ab # list)")
-   apply simp
-
-   apply (simp add:qq_def ss.simps)
-   apply (case_tac "norm_entries_list_h s (b ! (length b - Suc 0)) h")
-    apply simp
-
-    apply (simp add:key_lte0_def)
-    
-  apply (simp add:cond_sj_def qq_def from_to_set)
-   apply (subgoal_tac "s r = Some (INode (I (ab # list, b))) \<longrightarrow> union_clause (the (case norm_entries_list_h s r h of None \<Rightarrow> None | Some list \<Rightarrow> Some (set list))) s r (Suc h) \<longrightarrow> (\<forall>j. Suc 0 \<le> j \<and> j \<le> length b - 2 \<longrightarrow>
-  (ss (index b j) s h = Some (the ( (case norm_entries_list_h s (the(index b j)) h of None \<Rightarrow> None
-                   | Some list \<Rightarrow> Some (set list))))))")
-   apply (simp add:ss.simps qq_def dd_def)
+ (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) )))"
+apply (subgoal_tac "
+  (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc na
+  \<Longrightarrow>
+  (\<forall> x \<in> {x. x < Suc na}.  \<not> (k \<in> (set( map (entry_to_key env) (case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) ))))
+  \<and>
+  (\<forall> x \<in> {x.  Suc na < x \<and> x < length b}.  \<not> (k \<in> (set( map (entry_to_key env) (case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) ))))
+  ")
+  apply clarsimp
+  apply (case_tac h)
+  apply (simp add:norm_entries_list_h.simps)
+  
    
-     
-oops
+
+sorry
 
 lemma norm_entries_list_not_emtpy_if_wf_btree:
 "wf_env env \<longrightarrow> norm_wf_btree env s (r,the(ss (Some r) s h),the(mm (Some r) s)) h  \<longrightarrow>
