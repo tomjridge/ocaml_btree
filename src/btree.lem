@@ -196,7 +196,7 @@ module Fs_impl_types = struct
      env 'p 'e 'k ->
      bool
     let ~{ocaml}wf_env e0 = (
-      e0.minN > 1 &&
+      e0.minN > ((e0.maxN+1)/2) &&
         e0.maxN > 1 &&
     Relation.isTotalOrder (Relation.relFromPred {x| true} {x| true} e0.key_lte))
 
@@ -395,7 +395,9 @@ module BTree = struct
         let dj' = dd (j+1) ds in
         (match (sj',dj,dj') with
          | (Just sj', Just dj, Just dj') ->
-            Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
+            (not (Set.null sj')) (* cond_sj is meaningless if the set of entries is empty *)
+            &&
+              Set.all (fun s -> key_lte env dj (env.entry_to_key s)) sj'
             &&
               Set.all (fun s -> key_lt env (env.entry_to_key s) dj') sj'
          | _ -> false
@@ -424,7 +426,9 @@ module BTree = struct
       let s1 = ss (qq 1 qs) s0 h in
       (match (d1,s1) with
        | (Just d1,Just s1) ->
-          Set.all (fun s -> key_lt env (env.entry_to_key s) d1 ) s1
+          (not (Set.null s1) )(* cond_s1 is meaningless on an empty set of entries *)
+          &&
+            Set.all (fun s -> key_lt env (env.entry_to_key s) d1 ) s1
        | _ -> false
        end))
 
@@ -435,7 +439,9 @@ module BTree = struct
       let sn = ss (qq n qs) s0 h in
       (match (dn',sn) with
        | (Just dn',Just sn) ->
-          Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn
+          (not (Set.null sn)) (* cond_sn is meaningless on an empty set of entries *)
+          &&
+            Set.all (fun s -> key_lte env dn' (env.entry_to_key s) ) sn
        | _ -> false
        end))
 
