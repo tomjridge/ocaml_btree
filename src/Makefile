@@ -4,7 +4,7 @@ SHELL:=bash
 LEM:=$(shell command -v ../src_ext/lem/lem || command -v lem)
 EXTRACTDIR:=$(shell dirname $(LEM))/ocaml-lib/
 CAMLCINCLUDES:=-I $(EXTRACTDIR)/dependencies/zarith zarith.cma -I $(EXTRACTDIR) extract.cma
-CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -linkpkg
+CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -dllpath $(EXTRACTDIR)/dependencies/zarith/ -linkpkg
 
 BTREE_FILE:=btree.lem
 BTREE_TESTS_FILE:=btreeTests.lem

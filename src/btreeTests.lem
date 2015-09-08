@@ -8,8 +8,8 @@ assert nth_from_1_should_return_the_right_element: Utility.nth_from_1 [(1:nat);2
 assert nth_from_1_should_return_nothing_if_the_index_is_too_big: Utility.nth_from_1 [(1:nat)] 10 = Nothing
 assert nth_from_1_should_return_nothing_if_the_list_is_empty: Utility.nth_from_1 ([]:(list nat)) 0 = Nothing
 (* from_to *)
-assert from_to_should_return_an_empty_list_for_a_wrong_range:  Utility.from_to (10:nat) (2:nat) = []
-assert from_to_should_return_1_2_3_list_from_1_to_3:  Utility.from_to (1:nat) (3:nat) = [1;2;3]
+assert from_to_should_return_an_empty_list_for_a_wrong_range:  Utility.from_to (10:nat) (2:nat) = {}
+assert from_to_should_return_1_2_3_list_from_1_to_3:  Utility.from_to (1:nat) (3:nat) = (({1}union{2})union{3})
 (* first *)
 assert first_should_return_the_element_equal_to_2_in_1_2_3_4_list: Utility.first [(1:nat);2;3;4] (fun x -> x = 2) = Just 2
 assert first_should_return_nothing_if_the_condition_is_unsatisfied: Utility.first [(1:nat);2;3;4] (fun x -> x = 5) = Nothing
