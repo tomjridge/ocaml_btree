@@ -90,6 +90,9 @@ section "tree"
 
 datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k key * 'v) list"
 
+type_synonym tree_height = nat
+
+
 function tree_to_kvs :: "('k,'v) tree => ('k key *'v) list" where
   "tree_to_kvs (Tr_lf(kvs)) = kvs"
   | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
@@ -102,7 +105,7 @@ by (metis prod.sel(1) prod.sel(2) tree.inject(1))
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
-fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k,'v) tree option" where
+fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k,'v) tree option" where
   "page_ref_to_tree c0 s0 r0 0 = (
       case page_ref_to_frame c0 s0 r0 of 
       None => None 
@@ -127,7 +130,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
         | _ => impossible  (* impossible *)))"
 
 (* notice that this ideally belongs in section "page and frame" *)
-definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k key*'v) list option" where
+definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
   |> (% x. case x of
@@ -137,10 +140,10 @@ definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r pag
 definition kvs_to_map :: "('k key*'v) list => ('k key ~=> 'v)" where
   "kvs_to_map kvs == (map_of kvs)"
 
-definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k key ~=> 'v) option" where
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v) option" where
   "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
 
-definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => nat => 'v option" where
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => tree_height => 'v option" where
   "page_ref_key_to_v ctxt s0 r0 k0 n0 == (
     let m0 = page_ref_to_map ctxt s0 r0 n0 in
     Option.bind m0 (% m. m k0))"
@@ -212,7 +215,7 @@ text "iterate the fs_step function n times"
 
 (* FIXME in the following we may want to use a standard isabelle while construction *)
 definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt1 
-  => nat
+  => tree_height
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state)" where
   "fs_step_as_fun ctxt1 n0 s0fs0 == (
@@ -230,7 +233,7 @@ definition wf_ctxt:: "('bs,'k,'r,'v) ctxt => bool" where
 definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt1 => bool" where
   "wf_ctxt1 ctxt1 == True"
 
-definition wf_store:: "('r,'bs) store => nat => bool" where
+definition wf_store:: "('r,'bs) store => tree_height => bool" where
   "wf_store s0 n0 == True"
 
 
@@ -239,7 +242,7 @@ section "correctness of fs_step"
 
 definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt 
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state)
-  => nat
+  => tree_height
   => 'v option
   => bool" where
   "fs_step_invariant ctxt s0fs0 n0 v0 == (
@@ -254,6 +257,8 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
       let v' = (fsr|>fsr_v) in
       v' = v0))"
 
+lemma FIXME: "P" sorry
+
 
 lemma fs_step_is_invariant: "
   ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
@@ -267,7 +272,132 @@ lemma fs_step_is_invariant: "
   | Some (s',fs') => (
     (* n0 could be 0? but then fs' is Fs_r? *)
     fs_step_invariant ctxt (s',fs') (n0 - 1) v0)))"
-  oops
+  apply(rule)+
+  apply(elim conjE)
+  apply(subgoal_tac "? x. fs_step ctxt1 (s0, fs0) = x")
+   prefer 2
+   apply(force intro: FIXME)
+  apply(erule exE)
+  apply(simp add: Let_def)
+  apply(rule)+
+  apply(case_tac x)
+   (* none *)
+   apply(force)
+
+   (* x = Some a *)
+   apply(simp)
+   apply(subgoal_tac "? s' fs'. a=(s',fs')")
+    prefer 2
+    apply(force intro: FIXME)
+   apply(erule exE)+
+   apply(simp)
+   apply(simp add: fs_step_def)
+   apply(case_tac fs0)
+    prefer 2
+    apply(force)
+   (* fs0 = Fs_l find_state_l_ex *)
+   apply(simp)
+   apply(rename_tac "fsl")
+   apply(subgoal_tac "? r0. (fsl|>fsl_r) = r0")
+    prefer 2 apply(force)
+   apply(subgoal_tac "? k0. (fsl|>fsl_k) = k0 ")
+    prefer 2 apply(force)
+   apply(erule exE)+
+   apply(case_tac " (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0)")
+    apply(force)
+
+    (*  (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0) = Some r' *)
+    apply(rename_tac frm')
+    apply(simp)
+    apply(case_tac frm')
+     (* r' = Frm_I node_frame_ext *)
+     apply(rename_tac nf)
+     apply(simp)
+     apply(elim conjE)
+     apply(drule_tac s=s0 in sym)
+     apply(simp)
+     apply(thin_tac "s' = s0")
+     apply(subgoal_tac "? fsl'. (fsl\<lparr>fsl_r := (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0\<rparr>) = fsl'")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(simp)
+     apply(subgoal_tac "? r'. (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0 = r'")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(thin_tac "a = ?x")
+     apply(thin_tac "fs0 = ?x")
+     apply(thin_tac "frm' = ?x")
+     apply(thin_tac "x=?x")
+     (* note how this goal is concise and readable *)
+     apply(simp add: fs_step_invariant_def)
+     apply(drule_tac t="fs'" in sym)
+     apply(simp)
+     apply(thin_tac "fs' = ?x")
+     apply(drule_tac t="fsl'" in sym)
+     apply(simp)
+     apply(subgoal_tac "fsl\<lparr>fsl_r := r'\<rparr> = (| fsl_k = k0, fsl_r = r' |)") prefer 2 apply (metis (full_types) find_state_l.surjective find_state_l.update_convs(2) old.unit.exhaust rev_apply_def) 
+     apply(thin_tac "fsl' = fsl\<lparr>fsl_r := r'\<rparr> ")
+     apply(simp)
+     apply(simp add: rev_apply_def)
+     apply(simp add: page_ref_key_to_v_def)
+     (* page_ref_to_map could be none or some *)
+     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0) = m0")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(simp)
+     apply(case_tac m0)
+      (* m0 = None *)
+      apply(simp)
+      (* FIXME this case ruled out by wellformedness *)
+      apply(force intro: FIXME)
+
+      (* m0 = Some a *)
+      apply(rename_tac m1)
+      apply(simp)
+      apply(thin_tac "m0 = ?x")
+      apply(subgoal_tac "? m0'.  (page_ref_to_map (ctxt.truncate ctxt1) s0 r' (n0 - Suc 0)) = m0'")
+       prefer 2 apply(force)
+      apply(erule exE)
+      apply(simp)
+      apply(case_tac "m0'")
+       (* none - ruled out because m0 is_Some --> m0' is_Some *)
+       apply(force intro: FIXME)
+
+       (* m0' = Some a *)
+       apply(rename_tac "m1'")
+       apply(simp)
+       apply(thin_tac "m0'=?x")
+       (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref *)
+       apply(force intro:FIXME)
+
+
+     (* r' = Frm_L leaf_frame_ext - easy case? *)
+
+
+sorry
+
+(*
+
+     apply(subgoal_tac "(fsl' |> fsl_k) = k0 ") prefer 2 apply (metis find_state_l.cases find_state_l.select_convs(1) find_state_l.update_convs(2) rev_apply_def) 
+     apply(simp)
+     apply(subgoal_tac "(fsl' |> fsl_r) = r'") prefer 2 apply (metis find_state_l.cases find_state_l.select_convs(2) find_state_l.update_convs(2) rev_apply_def)
+     apply()
+     apply(thin_tac "fsl' = ?x")
+     apply(simp)
+     
+
+     apply(simp add: page_ref_key_to_v_def)
+     apply(case_tac v0)
+      apply(simp)
+     apply(simp add: Option.bind_def)
+     
+     
+   
+  
+  apply(simp add: Let_def)
+
+*)
+  
 
 
 (*
