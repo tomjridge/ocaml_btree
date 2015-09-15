@@ -355,7 +355,7 @@ lemma fs_step_is_invariant: "
      apply(case_tac m0)
       (* m0 = None *)
       apply(simp)
-      (* FIXME this case ruled out by wellformedness *)
+      (* FIXME this case ruled out by wellformedness - page_ref_to_map cannot be None *)
       apply(force intro: FIXME)
 
       (* m0 = Some a *)
@@ -495,7 +495,7 @@ lemma fs_step_is_invariant: "
        (* suc - should be a contradiction with leaf frame *)
        apply(rename_tac n0')
        apply(simp)
-       (* contradiction with wf_store! *)
+       (* contradiction with wf_store! can't have wf_store s0 (Suc n0') with Frm_L lf *)
        apply(force intro: FIXME)
   done
 
