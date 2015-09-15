@@ -4,6 +4,8 @@ imports
  	 Main
 begin
 
+section "preliminaries"
+
 (* Quickcheck_Examples/Completeness.thy - should be in Main? simpler defn here*)
 definition is_Some :: "'a option => bool" where
   "is_Some x == x ~= None"
@@ -19,6 +21,7 @@ definition arb :: "'a" where
 definition rev_apply :: "'a => ('a => 'b) => 'b" (infixl "|>" 100) where
   "rev_apply x f = f x"
 
+section "page, store"
 
 (* type vars: 'bs 'k 'r 'v *)
 
@@ -37,6 +40,10 @@ definition dest_store :: "('r,'bs) store => ('r ~=> 'bs page)" where
 definition ref_to_page :: "('r,'bs) store => 'r page_ref => 'bs page option" where
   "ref_to_page s0 r0 == (s0|>dest_store) (r0|>dest_page_ref)"
 
+
+section "key and frame"
+
+
 datatype 'k key = Key 'k
 
 record ('r,'k) node_frame = 
@@ -49,6 +56,9 @@ record ('k,'v) leaf_frame =
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
+
+section "page and frame"
+
 (* interpretation of pages *)
 datatype ('bs,'k,'r,'v) page_to_frame = P2f "'bs page => ('r,'k,'v) frame"  (* note that this forces that the page internally stores its type; this is not necessary, but is used by step_find *)
 
@@ -57,18 +67,6 @@ definition dest_p2f :: "('bs,'k,'r,'v) page_to_frame => 'bs page => ('r,'k,'v) f
 
 
 (* to convert a page_ref to a frame, lookup the page option and use the above *)
-
-
-datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k * 'v) list"
-
-function tree_to_kvs :: "('k,'v) tree => ('k*'v) list" where
-  "tree_to_kvs (Tr_lf(kvs)) = kvs"
-  | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
-apply (metis PairE tree.exhaust)
-apply (metis tree.inject(2))
-apply (metis tree.distinct(2))
-by (metis prod.sel(1) prod.sel(2) tree.inject(1))
-
 record  ('bs,'k,'r,'v) ctxt =
   ctxt_p2f :: "('bs,'k,'r,'v) page_to_frame"
 
@@ -80,6 +78,19 @@ definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store =>  'r pa
     | Some p => (Some( (c0|>ctxt_p2f|>dest_p2f) p))
 )"
 
+
+
+section "tree"
+
+datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k * 'v) list"
+
+function tree_to_kvs :: "('k,'v) tree => ('k*'v) list" where
+  "tree_to_kvs (Tr_lf(kvs)) = kvs"
+  | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
+apply (metis PairE tree.exhaust)
+apply (metis tree.inject(2))
+apply (metis tree.distinct(2))
+by (metis prod.sel(1) prod.sel(2) tree.inject(1))
 
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
 fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k,'v) tree option" where
@@ -106,6 +117,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
           | False => None)
         | _ => arb  (* impossible *)))"
 
+(* notice that this ideally belongs in section "page and frame" *)
 definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k*'v) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
@@ -113,18 +125,8 @@ definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r pag
     None => None
     | Some t => Some(tree_to_kvs t)))"
 
-(* find *)
-record ('bs,'k,'r,'v) find_state_l =
-  fsl_k :: "'k key"
-  fsl_r :: "'r page_ref"
-(*   fnd0_s :: "('r,'bs) store" *)
 
-record ('bs,'k,'r,'v) find_state_r =
-  fsr_r :: "'r page_ref"
-  fsr_v :: "'v option"
-(*  fnd1_s :: "('r,'bs) store" *)
-
-datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
+section "key_to_ref, key_to_v"
 
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
 datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *)
@@ -140,6 +142,21 @@ record  ('bs,'k,'r,'v) ctxt1 =  "('bs,'k,'r,'v) ctxt" +
   key_to_ref :: "('bs,'k,'r,'v) key_to_ref"
   key_to_v :: "('bs,'k,'r,'v) key_to_v"
 
+
+section "find"
+
+(* find *)
+record ('bs,'k,'r,'v) find_state_l =
+  fsl_k :: "'k key"
+  fsl_r :: "'r page_ref"
+(*   fnd0_s :: "('r,'bs) store" *)
+
+record ('bs,'k,'r,'v) find_state_r =
+  fsr_r :: "'r page_ref"
+  fsr_v :: "'v option"
+(*  fnd1_s :: "('r,'bs) store" *)
+
+datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
 
 
 
