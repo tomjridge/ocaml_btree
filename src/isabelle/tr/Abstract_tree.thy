@@ -71,7 +71,7 @@ datatype ('bs,'k,'r,'v) page_to_frame = P2f "'bs page => ('r,'k,'v) frame"  (* n
 definition dest_p2f :: "('bs,'k,'r,'v) page_to_frame => 'bs page => ('r,'k,'v) frame" where
   "dest_p2f x = (case x of P2f f => f)"
 
-
+(**********)
 (* to convert a page_ref to a frame, lookup the page option and use the above *)
 record  ('bs,'k,'r,'v) ctxt =
   ctxt_p2f :: "('bs,'k,'r,'v) page_to_frame"
@@ -150,6 +150,7 @@ definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r pag
 
 section "key_to_ref, key_to_v"
 
+(* NB we need some properties of these functions for correctness *)
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
 datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *)
 
@@ -159,7 +160,7 @@ definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame =
 definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v option" where
   "dest_key_to_v k2v == (case k2v of Key_to_v f => f)"
 
-
+(**********)
 record  ('bs,'k,'r,'v) ctxt1 =  "('bs,'k,'r,'v) ctxt" +
   key_to_ref :: "('bs,'k,'r,'v) key_to_ref"
   key_to_v :: "('bs,'k,'r,'v) key_to_v"
@@ -219,6 +220,21 @@ definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt1
   (f0^^n0) s0fs0)"
 
 
+section "wellformedness predicates"
+
+(* FIXME obviously the following need to be filled in properly *)
+
+definition wf_ctxt:: "('bs,'k,'r,'v) ctxt => bool" where
+  "wf_ctxt ctxt == True"
+
+definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt1 => bool" where
+  "wf_ctxt1 ctxt1 == True"
+
+definition wf_store:: "('r,'bs) store => nat => bool" where
+  "wf_store s0 n0 == True"
+
+
+
 section "correctness of fs_step"
 
 definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt 
@@ -239,17 +255,19 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
       v' = v0))"
 
 
-(* NB the following is missing the wellformedness predicate, so won't work as-is *)
 lemma fs_step_is_invariant: "
   ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
+  wf_ctxt1 ctxt1 & wf_store s0 n0 
+  --> (
   let ctxt = (ctxt.truncate ctxt1) in
   fs_step_invariant ctxt (s0,fs0) n0 v0 --> (
   let x = fs_step ctxt1 (s0,fs0) in
   case x of 
   None => True  (* if we are at a Fs_r, no further facts are available *)
   | Some (s',fs') => (
-    fs_step_invariant ctxt (s',fs') (n0 - 1) v0))"
-
+    (* n0 could be 0? but then fs' is Fs_r? *)
+    fs_step_invariant ctxt (s',fs') (n0 - 1) v0)))"
+  oops
 
 
 (*
