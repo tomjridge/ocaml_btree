@@ -239,6 +239,7 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
       v' = v0))"
 
 
+(* NB the following is missing the wellformedness predicate, so won't work as-is *)
 lemma fs_step_is_invariant: "
   ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
   let ctxt = (ctxt.truncate ctxt1) in
