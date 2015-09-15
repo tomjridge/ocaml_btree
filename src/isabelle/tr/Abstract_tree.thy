@@ -1,7 +1,7 @@
 theory "Abstract_tree" 
 
 imports 
- 	 Main
+ 	 Main "~~/src/HOL/Library/Multiset" (* for size_change *)
 begin
 
 section "preliminaries"
@@ -92,14 +92,15 @@ datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" 
 
 type_synonym tree_height = nat
 
+lemma FIXME: "P" sorry
 
 function tree_to_kvs :: "('k,'v) tree => ('k key *'v) list" where
   "tree_to_kvs (Tr_lf(kvs)) = kvs"
   | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
-apply (metis PairE tree.exhaust)
-apply (metis tree.inject(2))
-apply (metis tree.distinct(2))
-by (metis prod.sel(1) prod.sel(2) tree.inject(1))
+by pat_completeness auto
+termination  (* tree_to_kvs_dom is not right here - the function package seems confused FIXME *)
+  apply(force intro:FIXME)
+  done
 
 
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
@@ -155,18 +156,23 @@ section "key_to_ref, key_to_v"
 
 (* NB we need some properties of these functions for correctness *)
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
-datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *)
+(* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
+
+definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v option" where
+  "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
 definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
   "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
 
+(*
 definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v option" where
   "dest_key_to_v k2v == (case k2v of Key_to_v f => f)"
+*)
 
 (**********)
 record  ('bs,'k,'r,'v) ctxt1 =  "('bs,'k,'r,'v) ctxt" +
   key_to_ref :: "('bs,'k,'r,'v) key_to_ref"
-  key_to_v :: "('bs,'k,'r,'v) key_to_v"
+(*  key_to_v :: "('bs,'k,'r,'v) key_to_v" *)
 
 
 section "find"
@@ -204,7 +210,7 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt1
         let r' = k2r nf k0 in
         Some(s0, Fs_l (fsl (| fsl_r := r' |))))
       | Frm_L lf => (
-        let k2v = ((ctxt1|>key_to_v)|>dest_key_to_v) in
+        let k2v = key_to_v in
         let v = k2v lf k0 in
         Some(s0, Fs_r (| fsr_r = r0, fsr_v = v |)))))
   | Fs_r fsr => None)"
@@ -257,7 +263,7 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
       let v' = (fsr|>fsr_v) in
       v' = v0))"
 
-lemma FIXME: "P" sorry
+
 
 
 lemma fs_step_is_invariant: "
@@ -310,13 +316,18 @@ lemma fs_step_is_invariant: "
     apply(rename_tac frm')
     apply(simp)
     apply(case_tac frm')
-     (* r' = Frm_I node_frame_ext *)
+     (**********)
+     (* frm' = Frm_I node_frame_ext *)
      apply(rename_tac nf)
      apply(simp)
      apply(elim conjE)
      apply(drule_tac s=s0 in sym)
      apply(simp)
      apply(thin_tac "s' = s0")
+     apply(thin_tac "a = ?x")
+     apply(thin_tac "fs0 = ?x")
+     apply(thin_tac "frm' = ?x")
+     apply(thin_tac "x=?x")
      apply(subgoal_tac "? fsl'. (fsl\<lparr>fsl_r := (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0\<rparr>) = fsl'")
       prefer 2 apply(force)
      apply(erule exE)
@@ -324,10 +335,6 @@ lemma fs_step_is_invariant: "
      apply(subgoal_tac "? r'. (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0 = r'")
       prefer 2 apply(force)
      apply(erule exE)
-     apply(thin_tac "a = ?x")
-     apply(thin_tac "fs0 = ?x")
-     apply(thin_tac "frm' = ?x")
-     apply(thin_tac "x=?x")
      (* note how this goal is concise and readable *)
      apply(simp add: fs_step_invariant_def)
      apply(drule_tac t="fs'" in sym)
@@ -371,69 +378,125 @@ lemma fs_step_is_invariant: "
        apply(force intro:FIXME)
 
 
-     (* r' = Frm_L leaf_frame_ext - easy case? *)
-
-
-sorry
-
-(*
-
-     apply(subgoal_tac "(fsl' |> fsl_k) = k0 ") prefer 2 apply (metis find_state_l.cases find_state_l.select_convs(1) find_state_l.update_convs(2) rev_apply_def) 
+     (* frm' = Frm_L leaf_frame_ext - easy case? *)
+     apply(rename_tac lf)
      apply(simp)
-     apply(subgoal_tac "(fsl' |> fsl_r) = r'") prefer 2 apply (metis find_state_l.cases find_state_l.select_convs(2) find_state_l.update_convs(2) rev_apply_def)
-     apply()
-     apply(thin_tac "fsl' = ?x")
+     apply(elim conjE)
+     apply(drule_tac s=s0 in sym)
      apply(simp)
-     
-
+     apply(thin_tac "s' = s0")
+     apply(thin_tac "a = ?x")
+     apply(thin_tac "fs0 = ?x")
+     apply(thin_tac "frm' = ?x")
+     apply(thin_tac "x=?x")
+     (* we have got to a leaf, and at frm' we return Fs_r *)
+     apply(subgoal_tac "? fsr'.  \<lparr>fsr_r = r0, fsr_v = key_to_v lf k0\<rparr> = fsr'")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(simp)
+     apply(subgoal_tac "? v'. key_to_v lf k0 = v'")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(simp add: fs_step_invariant_def)
+     apply(drule_tac t="fs'" in sym)
+     apply(simp)
+     apply(thin_tac "fs' = ?x")
+     apply(drule_tac t="fsr'" in sym)
+     apply(simp)
+     apply(thin_tac "fsr' = ?x")
+     apply(simp)
+     apply(simp add: rev_apply_def)
      apply(simp add: page_ref_key_to_v_def)
-     apply(case_tac v0)
+     (* page_ref_to_map could be none or some *)
+     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0) = m0")
+      prefer 2 apply(force)
+     apply(erule exE)
+     apply(simp)
+     apply(case_tac m0)
+      (* m0 = None *)
       apply(simp)
-     apply(simp add: Option.bind_def)
-     
-     
-   
-  
-  apply(simp add: Let_def)
+      (* the map at r0 is none ; but we have a leaf frame; contradiction *)
+      apply(simp add: page_ref_to_frame_def)
+      apply(case_tac "ref_to_page s0 r0") apply(force)
+      apply(simp)
+      apply(rename_tac p0)
+      (*  ref_to_page s0 r0 = Some p0 *)
+      apply(simp add: page_ref_to_map_def)
+      apply(case_tac "page_ref_to_kvs (ctxt.truncate ctxt1) s0 r0 n0") 
+       (* none *)
+       apply(simp)
+       apply(simp add: ref_to_page_def)
+       apply(simp add: page_ref_to_kvs_def)
+       apply(simp add: rev_apply_def)
+       apply(case_tac "page_ref_to_tree (ctxt.truncate ctxt1) s0 r0 n0")
+        (* none *)
+        (* page_ref_to_tree defined by primrec *)
+        apply(case_tac n0)
+         apply(simp)
+         apply(simp add: page_ref_to_frame_def)
+         apply(force simp add: ref_to_page_def rev_apply_def)
 
-*)
-  
+         (* n0 = suc nat *)
+         apply(rename_tac n0')
+         apply(simp)
+         apply(simp add: page_ref_to_frame_def)
+         apply(simp add: ref_to_page_def rev_apply_def)
+         (* this case should be impossible because n0 was not 0, but we got a leaf ; by wf of store *)
+         apply(force intro:FIXME)
 
+        (* page_ref_to_tree = Some a *)
+        apply(rename_tac t0)
+         apply(case_tac n0)
+          apply(force)
 
-(*
-lemma correct_fs_step: "
-  ! s0 fs0.
-  let f0 = fs_step ctxt1 in
-  
-  "
-*)
+          (* n0 = suc nat *)
+          apply(rename_tac n0')
+          apply(force)
 
+       (* page_ref_to_kvs = Some a *)
+       apply(rename_tac kvs)
+       apply(simp)
+       (* but m0 = none, so can't have kvs = some *)
+       apply(force simp add:rev_apply_def)
 
-(*
-locale l0 = 
-  fixes r0:: "'r store_ref" 
-  and s0:: "('a,'b,'r) store"
-*)
+      (* m0 = some a *)
+      apply(rename_tac m1)
+      apply(simp)
+      apply(thin_tac "m0 = ?x")
+      apply(simp)
+      apply(simp add: page_ref_to_map_def)
+      apply(simp add: rev_apply_def)
+      apply(elim exE conjE)
+      apply(simp add: page_ref_to_kvs_def rev_apply_def)
+      apply(case_tac n0)
+       (* 0 *)
+       apply(simp)
+       apply(simp add: rev_apply_def)
+       apply(simp add: kvs_to_map_def)
+       apply(drule_tac t=z in sym)
+       apply(simp)
+       apply(thin_tac "z=?x")
+       apply(subgoal_tac "fsl = (| fsl_k = k0, fsl_r = r0 |)") prefer 2 apply(force)
+       apply(simp)
+       apply(simp add:page_ref_to_frame_def)
+       apply(case_tac "ref_to_page s0 r0") apply(force)
+       apply(rename_tac p0)
+       apply(simp)
+       apply(simp add: ref_to_page_def)
+       apply(subgoal_tac "? kvs. lf = (| lf_kvs=kvs |)") prefer 2 apply (metis leaf_frame.cases)  
+       apply(elim exE)
+       apply(simp)
+       apply(thin_tac "lf=?x")
+       apply(thin_tac "fsl=?x")
+       apply(thin_tac "n0=0")
+       apply(clarsimp)
+       apply(force simp add: key_to_v_def rev_apply_def)
+
+       (* suc - should be a contradiction with leaf frame *)
+       apply(rename_tac n0')
+       apply(simp)
+       (* contradiction with wf_store! *)
+       apply(force intro: FIXME)
+  done
 
 end
-
-
-
-(*
-
-
-  let (s0,fs0) = s0fs0 in
-  let P = (% x.
-    let (f,n) = x in
-    (f 0 = (s0,fs0)) 
-    & (
-    let (s1,fs1) = f n in
-    case fs1 of Fs_l _ => False | Fs_r _ => True)
-    & (! m. m < n --> (case (fs_step ctxt1 (f m)) of None => False | Some x => (x=f(Suc m)))))
-  in 
-  if (? fn. P fn) then
-    let (f,n) = SOME fn. P fn in
-    Some(f n)
-  else
-    None)
-*)
