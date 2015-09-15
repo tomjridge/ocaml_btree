@@ -58,7 +58,7 @@ record ('r,'k) node_frame =
   nf_rs :: "nat => 'r page_ref"
 
 record ('k,'v) leaf_frame = 
-  lf_kvs :: "('k * 'v) list" (* slightly different to paper - we store ks in tree *) 
+  lf_kvs :: "('k key * 'v) list" (* slightly different to paper - we store ks in tree *) 
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
@@ -88,9 +88,9 @@ definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store =>  'r pa
 
 section "tree"
 
-datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k * 'v) list"
+datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k key * 'v) list"
 
-function tree_to_kvs :: "('k,'v) tree => ('k*'v) list" where
+function tree_to_kvs :: "('k,'v) tree => ('k key *'v) list" where
   "tree_to_kvs (Tr_lf(kvs)) = kvs"
   | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
 apply (metis PairE tree.exhaust)
@@ -99,7 +99,7 @@ apply (metis tree.distinct(2))
 by (metis prod.sel(1) prod.sel(2) tree.inject(1))
 
 
-section "page_ref_to_tree, page_ref_to_map"
+section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
 fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k,'v) tree option" where
@@ -127,18 +127,25 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
         | _ => impossible  (* impossible *)))"
 
 (* notice that this ideally belongs in section "page and frame" *)
-definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k*'v) list option" where
+definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k key*'v) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
   |> (% x. case x of
     None => None
     | Some t => Some(tree_to_kvs t)))"
 
-definition kvs_to_map :: "('k*'v) list => ('k ~=> 'v)" where
+definition kvs_to_map :: "('k key*'v) list => ('k key ~=> 'v)" where
   "kvs_to_map kvs == (map_of kvs)"
 
-definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k ~=> 'v) option" where
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k key ~=> 'v) option" where
   "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
+
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => nat => 'v option" where
+  "page_ref_key_to_v ctxt s0 r0 k0 n0 == (
+    let m0 = page_ref_to_map ctxt s0 r0 n0 in
+    Option.bind m0 (% m. m k0))"
+
+
 
 
 section "key_to_ref, key_to_v"
@@ -214,10 +221,35 @@ definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt1
 
 section "correctness of fs_step"
 
-definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => 'k key => nat => 'v option" where
-  "page_ref_key_to_v ctxt1 s0 r0 k0 n0 == (
-    let m0 = page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0 in
-    Option.bind m0 (% m. m (k0|>dest_key)))"
+definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt 
+  => (('r,'bs) store * ('bs,'k,'r,'v) find_state)
+  => nat
+  => 'v option
+  => bool" where
+  "fs_step_invariant ctxt s0fs0 n0 v0 == (
+    let (s0,fs0) = s0fs0 in
+    case fs0 of
+    Fs_l fsl => (
+      let k0 = (fsl|>fsl_k) in
+      let r0 = (fsl|>fsl_r) in
+      let v' = page_ref_key_to_v ctxt s0 r0 k0 n0 in
+      v' = v0)
+    | Fs_r fsr => (
+      let v' = (fsr|>fsr_v) in
+      v' = v0))"
+
+
+lemma fs_step_is_invariant: "
+  ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
+  let ctxt = (ctxt.truncate ctxt1) in
+  fs_step_invariant ctxt (s0,fs0) n0 v0 --> (
+  let x = fs_step ctxt1 (s0,fs0) in
+  case x of 
+  None => True  (* if we are at a Fs_r, no further facts are available *)
+  | Some (s',fs') => (
+    fs_step_invariant ctxt (s',fs') (n0 - 1) v0))"
+
+
 
 (*
 lemma correct_fs_step: "
