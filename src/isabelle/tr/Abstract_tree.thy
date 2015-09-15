@@ -16,12 +16,15 @@ primrec dest_Some (* :: "'a option => 'a" *) where
 
 
 definition arb :: "'a" where
-  "arb == SOME x. True"  (* where is this in lib? *)
+  "arb == undefined"  
+
+definition impossible :: "'a" where
+  "impossible == undefined"  
 
 definition rev_apply :: "'a => ('a => 'b) => 'b" (infixl "|>" 100) where
   "rev_apply x f = f x"
 
-section "page, store"
+section "page, page_ref, store"
 
 (* type vars: 'bs 'k 'r 'v *)
 
@@ -45,6 +48,9 @@ section "key and frame"
 
 
 datatype 'k key = Key 'k
+
+definition dest_key :: "'k key => 'k" where
+  "dest_key k = (case k of Key k => k)"
 
 record ('r,'k) node_frame = 
   nf_n :: "nat"
@@ -92,6 +98,9 @@ apply (metis tree.inject(2))
 apply (metis tree.distinct(2))
 by (metis prod.sel(1) prod.sel(2) tree.inject(1))
 
+
+section "page_ref_to_tree, page_ref_to_map"
+
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
 fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k,'v) tree option" where
   "page_ref_to_tree c0 s0 r0 0 = (
@@ -100,7 +109,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
       | Some frm => (
         case frm of 
         Frm_L(lf) => (Some(Tr_lf (lf|>lf_kvs)))
-        | _ => arb  (* impossible *)))"
+        | _ => impossible  (* impossible *)))"
   | "page_ref_to_tree c0 s0 r0 (Suc n') = (
     let n0 = (Suc n') in
       case page_ref_to_frame c0 s0 r0 of
@@ -115,7 +124,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
           case (! (m::nat). m < n --> m |> rs |> f0 |> is_Some)  of
           True => (Some(Tr_nd(n,ks,(% (m::nat). m |> rs |> f0 |> dest_Some))))
           | False => None)
-        | _ => arb  (* impossible *)))"
+        | _ => impossible  (* impossible *)))"
 
 (* notice that this ideally belongs in section "page and frame" *)
 definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k*'v) list option" where
@@ -124,6 +133,12 @@ definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r pag
   |> (% x. case x of
     None => None
     | Some t => Some(tree_to_kvs t)))"
+
+definition kvs_to_map :: "('k*'v) list => ('k ~=> 'v)" where
+  "kvs_to_map kvs == (map_of kvs)"
+
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => nat => ('k ~=> 'v) option" where
+  "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
 
 
 section "key_to_ref, key_to_v"
@@ -183,7 +198,34 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt1
         Some(s0, Fs_r (| fsr_r = r0, fsr_v = v |)))))
   | Fs_r fsr => None)"
 
+section "fs_step as a function"
 
+text "iterate the fs_step function n times"
+
+(* FIXME in the following we may want to use a standard isabelle while construction *)
+definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt1 
+  => nat
+  => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
+  => (('r,'bs) store * ('bs,'k,'r,'v) find_state)" where
+  "fs_step_as_fun ctxt1 n0 s0fs0 == (
+  let f0 = % x. x |> (fs_step ctxt1) |> dest_Some in
+  (f0^^n0) s0fs0)"
+
+
+section "correctness of fs_step"
+
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => 'k key => nat => 'v option" where
+  "page_ref_key_to_v ctxt1 s0 r0 k0 n0 == (
+    let m0 = page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0 in
+    Option.bind m0 (% m. m (k0|>dest_key)))"
+
+(*
+lemma correct_fs_step: "
+  ! s0 fs0.
+  let f0 = fs_step ctxt1 in
+  
+  "
+*)
 
 
 (*
@@ -193,3 +235,24 @@ locale l0 =
 *)
 
 end
+
+
+
+(*
+
+
+  let (s0,fs0) = s0fs0 in
+  let P = (% x.
+    let (f,n) = x in
+    (f 0 = (s0,fs0)) 
+    & (
+    let (s1,fs1) = f n in
+    case fs1 of Fs_l _ => False | Fs_r _ => True)
+    & (! m. m < n --> (case (fs_step ctxt1 (f m)) of None => False | Some x => (x=f(Suc m)))))
+  in 
+  if (? fn. P fn) then
+    let (f,n) = SOME fn. P fn in
+    Some(f n)
+  else
+    None)
+*)
