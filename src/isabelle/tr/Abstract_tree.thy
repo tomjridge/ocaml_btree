@@ -6,6 +6,10 @@ begin
 
 section "preliminaries"
 
+definition rev_apply :: "'a => ('a => 'b) => 'b" (infixl "|>" 100) where
+  "rev_apply x f = f x"
+
+
 (* Quickcheck_Examples/Completeness.thy - should be in Main? simpler defn here*)
 definition is_Some :: "'a option => bool" where
   "is_Some x == x ~= None"
@@ -21,8 +25,15 @@ definition arb :: "'a" where
 definition impossible :: "'a" where
   "impossible == undefined"  
 
-definition rev_apply :: "'a => ('a => 'b) => 'b" (infixl "|>" 100) where
-  "rev_apply x f = f x"
+datatype 'a rresult = Ok 'a | Error 
+
+definition rresult_to_option :: "'a rresult => 'a option" where
+  "rresult_to_option x = (case x of Ok x => Some x | Error => None)"
+
+lemma [simp]: "(Error |> rresult_to_option = None) & ((Ok x) |> rresult_to_option = Some x)"
+  apply(force simp: rresult_to_option_def rev_apply_def)
+  done
+
 
 section "page, page_ref, store"
 
@@ -35,13 +46,13 @@ datatype 'r page_ref = Page_ref 'r
 definition dest_page_ref :: "'r page_ref => 'r" where
   "dest_page_ref r0 == (case r0 of Page_ref r => r)"
 
-datatype ('r,'bs) store = Store "('r ~=> 'bs page)"  (* different to paper: we store actual bytes *)
+datatype ('r,'bs) store = Store "('r page_ref ~=> 'bs page)"  (* different to paper: we store actual bytes *)
 
-definition dest_store :: "('r,'bs) store => ('r ~=> 'bs page)" where
+definition dest_store :: "('r,'bs) store => ('r page_ref ~=> 'bs page)" where
   "dest_store s0 == (case s0 of Store f => f)"
 
 definition ref_to_page :: "('r,'bs) store => 'r page_ref => 'bs page option" where
-  "ref_to_page s0 r0 == (s0|>dest_store) (r0|>dest_page_ref)"
+  "ref_to_page s0 r0 == (s0|>dest_store) r0"
 
 
 section "key and frame"
@@ -52,13 +63,20 @@ datatype 'k key = Key 'k
 definition dest_key :: "'k key => 'k" where
   "dest_key k = (case k of Key k => k)"
 
+
+datatype 'v value_t = Value 'v
+
+definition dest_value :: "'v value_t => 'v" where
+  "dest_value v == (case v of Value v => v)"
+
+
 record ('r,'k) node_frame = 
   nf_n :: "nat"
   nf_ks :: "nat => 'k key"
   nf_rs :: "nat => 'r page_ref"
 
 record ('k,'v) leaf_frame = 
-  lf_kvs :: "('k key * 'v) list" (* slightly different to paper - we store ks in tree *) 
+  lf_kvs :: "('k key * 'v value_t) list" (* slightly different to paper - we store ks in tree *) 
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
@@ -80,7 +98,7 @@ record  ('bs,'k,'r,'v) ctxt =
 definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store =>  'r page_ref => ('r,'k,'v) frame option" where
   "page_ref_to_frame c0 s0 r0 == (
     case ref_to_page s0 r0 of
-    None => None
+    None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some p => (Some( (c0|>ctxt_p2f|>dest_p2f) p))
 )"
 
@@ -88,13 +106,13 @@ definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store =>  'r pa
 
 section "tree"
 
-datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k key * 'v) list"
+datatype ('k,'v) tree = Tr_nd "(nat * (nat => 'k key) * (nat => ('k,'v) tree))" | Tr_lf "('k key * 'v value_t) list"
 
 type_synonym tree_height = nat
 
 lemma FIXME: "P" sorry
 
-function tree_to_kvs :: "('k,'v) tree => ('k key *'v) list" where
+function tree_to_kvs :: "('k,'v) tree => ('k key *'v value_t) list" where
   "tree_to_kvs (Tr_lf(kvs)) = kvs"
   | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
 by pat_completeness auto
@@ -109,42 +127,42 @@ section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k,'v) tree option" where
   "page_ref_to_tree c0 s0 r0 0 = (
       case page_ref_to_frame c0 s0 r0 of 
-      None => None 
+      None => (Error |> rresult_to_option) 
       | Some frm => (
         case frm of 
         Frm_L(lf) => (Some(Tr_lf (lf|>lf_kvs)))
-        | _ => impossible  (* impossible *)))"
+        | _ => (Error |> rresult_to_option )))"  (* attempt to access missing page *)
   | "page_ref_to_tree c0 s0 r0 (Suc n') = (
-    let n0 = (Suc n') in
       case page_ref_to_frame c0 s0 r0 of
-      None => None
-      |  Some frm => (
+      None => (Error |> rresult_to_option)  (* attempt to access missign page *)
+      | Some frm => (
         case frm of 
         Frm_I(nf) => (
           let n = (nf|>nf_n) in
           let ks = (nf|>nf_ks) in
           let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
           let f0 = (% r. page_ref_to_tree c0 s0 r n') :: ('r page_ref => ('k,'v) tree option) in 
-          case (! (m::nat). m < n --> m |> rs |> f0 |> is_Some)  of
+          let prop = (! (m::nat). m < n --> m |> rs |> f0 |> is_Some) in
+          case prop of
           True => (Some(Tr_nd(n,ks,(% (m::nat). m |> rs |> f0 |> dest_Some))))
-          | False => None)
-        | _ => impossible  (* impossible *)))"
+          | False => (Error |> rresult_to_option))  (* Frm_I was not wellformed - prop was false *)
+        | Frm_L(_) => (Error |> rresult_to_option)))"  (* found Frm_L but tree_height was not 0 *)
 
 (* notice that this ideally belongs in section "page and frame" *)
-definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v) list option" where
+definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v value_t) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
   |> (% x. case x of
     None => None
     | Some t => Some(tree_to_kvs t)))"
 
-definition kvs_to_map :: "('k key*'v) list => ('k key ~=> 'v)" where
+definition kvs_to_map :: "('k key*'v value_t) list => ('k key ~=> 'v value_t)" where
   "kvs_to_map kvs == (map_of kvs)"
 
-definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v) option" where
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v value_t) option" where
   "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
 
-definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => tree_height => 'v option" where
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => tree_height => 'v value_t option" where
   "page_ref_key_to_v ctxt s0 r0 k0 n0 == (
     let m0 = page_ref_to_map ctxt s0 r0 n0 in
     Option.bind m0 (% m. m k0))"
@@ -158,14 +176,14 @@ section "key_to_ref, key_to_v"
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
 (* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
 
-definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v option" where
+definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
   "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
 definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
   "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
 
 (*
-definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v option" where
+definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v value_t option" where
   "dest_key_to_v k2v == (case k2v of Key_to_v f => f)"
 *)
 
@@ -185,7 +203,7 @@ record ('bs,'k,'r,'v) find_state_l =
 
 record ('bs,'k,'r,'v) find_state_r =
   fsr_r :: "'r page_ref"
-  fsr_v :: "'v option"
+  fsr_v :: "'v value_t option"
 (*  fnd1_s :: "('r,'bs) store" *)
 
 datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
@@ -202,7 +220,7 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt1
     let r0 = (fsl|>fsl_r) in
     let k0 = (fsl|>fsl_k) in
     case (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0) of 
-    None => None
+    None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
       case frm of 
       Frm_I nf => (
@@ -213,7 +231,8 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt1
         let k2v = key_to_v in
         let v = k2v lf k0 in
         Some(s0, Fs_r (| fsr_r = r0, fsr_v = v |)))))
-  | Fs_r fsr => None)"
+  | Fs_r fsr => (Error |> rresult_to_option))"  (* attempt to step Fs_r *)
+
 
 section "fs_step as a function"
 
@@ -249,7 +268,7 @@ section "correctness of fs_step"
 definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt 
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state)
   => tree_height
-  => 'v option
+  => 'v value_t option
   => bool" where
   "fs_step_invariant ctxt s0fs0 n0 v0 == (
     let (s0,fs0) = s0fs0 in
@@ -494,9 +513,7 @@ lemma fs_step_is_invariant: "
 
        (* suc - should be a contradiction with leaf frame *)
        apply(rename_tac n0')
-       apply(simp)
-       (* contradiction with wf_store! can't have wf_store s0 (Suc n0') with Frm_L lf *)
-       apply(force intro: FIXME)
+       apply(force)
   done
 
 end
