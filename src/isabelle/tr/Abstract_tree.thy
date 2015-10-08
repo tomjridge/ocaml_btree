@@ -134,15 +134,15 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
         | _ => (Error |> rresult_to_option )))"  (* attempt to access missing page *)
   | "page_ref_to_tree c0 s0 r0 (Suc n') = (
       case page_ref_to_frame c0 s0 r0 of
-      None => (Error |> rresult_to_option)  (* attempt to access missign page *)
+      None => (Error |> rresult_to_option)  (* attempt to access missing page *)
       | Some frm => (
         case frm of 
         Frm_I(nf) => (
           let n = (nf|>nf_n) in
           let ks = (nf|>nf_ks) in
           let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
-          let f0 = (% r. page_ref_to_tree c0 s0 r n') :: ('r page_ref => ('k,'v) tree option) in 
-          let prop = (! (m::nat). m < n --> m |> rs |> f0 |> is_Some) in
+          let f0 = (% r. page_ref_to_tree c0 s0 r n') :: ('r page_ref => ('k,'v) tree option) in
+          let prop = (! (m::nat). m <= n --> m |> rs |> f0 |> is_Some) in (* we use \<le> because the number of subtrees to create is n (number of keys) + 1 --since we start from index 0, it is just n*)
           case prop of
           True => (Some(Tr_nd(n,ks,(% (m::nat). m |> rs |> f0 |> dest_Some))))
           | False => (Error |> rresult_to_option))  (* Frm_I was not wellformed - prop was false *)
