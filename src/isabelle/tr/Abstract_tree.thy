@@ -114,7 +114,7 @@ lemma FIXME: "P" sorry
 
 function tree_to_kvs :: "('k,'v) tree => ('k key *'v value_t) list" where
   "tree_to_kvs (Tr_lf(kvs)) = kvs"
-  | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)"
+  | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n+1] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)" (* we use n+1 because there must be n (i.e. number of keys + 1 departing from index 0) subtrees in each internal node*)
 by pat_completeness auto
 termination  (* tree_to_kvs_dom is not right here - the function package seems confused FIXME *)
   apply(force intro:FIXME)
