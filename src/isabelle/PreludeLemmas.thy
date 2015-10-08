@@ -27,6 +27,17 @@ apply (induct list)
   apply auto
 done
 
+lemma find_index_None_iff:
+"(find_index p l = None) = ( (l = []) \<or> (\<forall> x \<in> set l. \<not> (p x)) )"
+by (case_tac l,simp+)
+
+lemma find_index_Some_iff:
+"(find_index p l = Some i) = ( (l \<noteq> []) \<and> i < length l \<and> (p (l!i)) \<and> (\<forall> n < i. \<not> (p (l!n))))"
+apply auto
+done
+  
+
+
 lemma first_returns_something_only_if [simp]:
 "\<forall> p i. first xs p = Some i \<longrightarrow> \<not> (xs = []) \<and> \<not>(i = 0) \<and> (i < Suc (length xs))"
 apply auto
@@ -40,6 +51,47 @@ apply (simp add:first_def)
 apply (case_tac "find_index p xs")
   apply auto
 done
+
+lemma first_None_iff:
+"(first xs p = None) = ((xs = []) \<or> (\<forall> x \<in> set xs. \<not> p x))"
+apply rule
+ apply (simp add:first_def)
+ apply (case_tac "find_index p xs",simp+)
+
+ apply (erule disjE)
+ apply (simp add:first_def find_index_def)
+
+ apply (induct xs)
+  apply (simp add:first_def find_index_def)
+
+  apply (simp add:first_def find_index_def)
+   apply (case_tac "find_indices p xs")
+   apply simp+
+done 
+
+lemma first_Some_iff:
+"(first xs p = Some n) = ((xs \<noteq> []) \<and> (n - 1 < length xs) \<and> (p (xs ! n - 1) \<and> (\<forall>j< n - 1. \<not> p (xs ! j))))"
+apply (simp add:first_def)
+apply rule+
+ (* xs = []*)
+ apply (simp add:find_index_def)
+
+ (* (case find_index p xs of None \<Rightarrow> None | Some i \<Rightarrow> Some (i + 1)) = Some n \<Longrightarrow> n < length xs \<and> p (xs ! n - 1) \<and> (\<forall>j<n - Suc 0. \<not> p (xs ! j)) *)
+ apply (case_tac "find_index p xs")
+  apply simp
+
+  apply (simp add:find_index_Some_iff)
+  apply (rename_tac "nth_p_true")
+  apply (erule conjE)+
+  apply (drule_tac t="n" in sym)
+  apply simp
+  apply (thin_tac "n = Suc nth_p_true")
+  (* this should be solved *)
+  defer
+  
+  apply (erule conjE)+
+  
+sorry
 
 
 lemma nth_from_1_is_like_nth [simp]:
@@ -768,6 +820,30 @@ apply (case_tac "n \<noteq> length qs")
    apply (simp add:resolve_ss_wf_btree resolve_mm_wf_btree)
 done
 
+lemma key_lt_not:
+"wf_env env \<Longrightarrow>
+  (\<not> (key_lt env k k1)) = key_lte env k1 k
+ "
+apply (simp add:key_lt_def wf_env_def relFromPred_def isTotalOrder_def isPartialOrder_def trans_def antisym_def total_on_def)
+apply (rule)
+ apply (erule conjE)+
+ apply (thin_tac "Suc (maxN env) div 2 < minN env")
+ apply (thin_tac "Suc 0 < maxN env")
+ apply (case_tac "key_lte env k k1")
+  apply simp
+
+  apply clarsimp
+  apply (metis iso_tuple_UNIV_I mem_Collect_eq old.prod.case refl_on_def)
+
+ apply (simp add:key_lt_def)
+done
+
+lemma key_lte_Cons:
+"wf_env env \<Longrightarrow>
+  key_lte env k1 k = (\<not> (key_lt env k k1)) "
+apply (simp add:key_lt_not)
+done
+
 lemma key_lt_transitivity:
 "wf_env env \<Longrightarrow>
   key_lt env k k1 \<Longrightarrow>
@@ -863,7 +939,7 @@ apply (induct list)
 done
 
 lemma sorted_by_key_lt_allDistinct:
-"wf_env env \<longrightarrow> sorted_by (key_lt env) list \<longrightarrow> allDistinct ( list)"
+"wf_env env \<Longrightarrow> sorted_by (key_lt env) list \<Longrightarrow> allDistinct ( list)"
 apply (induct list)
  apply (simp add:allDistinct.simps)
 
@@ -1073,6 +1149,18 @@ apply rule
  apply force
 done
 
+lemma allDistinct_concat_false:
+"xs \<noteq> [] \<Longrightarrow> allDistinct ((xs)@xs) = False"
+apply (simp add:allDistinct_concat)
+apply force
+done
+
+lemma allDistinct_eq_distinct:
+"allDistinct list = distinct list "
+apply (induct list)
+ apply (simp add:allDistinct.simps)+
+done
+
 lemma allDistinct_concat':
 "allDistinct ((xs)@ys) = ((\<forall> e \<in> (set (xs@ys)). \<not>(e \<in> set xs \<and> e \<in> set ys)) \<and> allDistinct xs \<and> allDistinct ys)"
 apply (simp add:allDistinct_concat)
@@ -1154,6 +1242,335 @@ apply (case_tac xs)
  apply simp
  apply (metis List.bind_def bind_simps(2) drop_Suc_Cons drop_Suc_conv_tl length_Cons)
 done
+
+lemma listfind_Suc_h_eq_listfind_h_if_ordered_keys1:
+"wf_env env \<Longrightarrow>
+ s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
+ b \<noteq> [] \<Longrightarrow>
+ (Suc (length (ab # list))) = length b \<Longrightarrow>
+ Suc na \<le> length b \<Longrightarrow> 
+ 2 \<le> length b \<Longrightarrow>
+ n = Suc na \<Longrightarrow>
+ union_clause (the (ss (Some r) s (Suc h))) s r (Suc h) \<and>
+ cond_sj env (length b) b (ab # list) s h \<and>
+           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
+ (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc na \<Longrightarrow>
+ ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+ =
+ (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) )))"
+(*FIXME I am assuming that norm_entries_list is sorted
+   this should appear as an hypothesis
+ *)
+apply (subgoal_tac "sorted_by (entry_lt env) (the (norm_entries_list_h s r (Suc h)))")
+defer
+ apply (force intro:sorry_fixme)
+apply (subgoal_tac "allDistinct (the (norm_entries_list_h s r (Suc h))) \<and> allDistinct (map (entry_to_key env) (the (norm_entries_list_h s r (Suc h))))")
+defer
+ apply (simp add:sorted_by_e_lt_allDistinct)
+apply (simp add:allDistinct_eq_distinct)
+apply (erule conjE)+
+
+apply (subgoal_tac "(the (norm_entries_list_h s r (Suc h)) = List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b))")
+defer
+ apply (simp add:union_clause_def norm_entries_list_h_simps)
+ apply (case_tac "\<not>(\<forall>x\<in>set b. \<exists>y. norm_entries_list_h s x h = Some y)",simp+)
+ apply force
+
+apply simp
+apply (subgoal_tac "\<exists> klist. norm_entries_list_h s (b ! na) h = Some klist")
+ defer
+ apply (simp add:union_clause_def norm_entries_list_h_simps)
+ apply (case_tac "\<not>(\<forall>x\<in>set b. \<exists>y. norm_entries_list_h s x h = Some y)",simp+)
+apply (erule exE)
+apply simp
+
+apply (subgoal_tac "? x. b!na = x")
+defer
+ apply simp
+
+apply (erule exE)
+apply (subgoal_tac "? xs ys. (b = xs@x#ys)")
+ defer
+ apply (subgoal_tac "x \<in> set b")
+ apply (simp add:split_list)
+  apply (force)
+apply (erule exE)+
+apply simp
+apply (erule conjE)+
+apply (subgoal_tac "? preklist. (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) xs)) = preklist")
+defer
+ apply simp
+apply (erule exE)
+apply simp
+apply (subgoal_tac "? postklist. (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) ys)) = postklist")
+defer
+ apply simp
+apply (erule exE)
+apply simp
+apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) (preklist @ klist @ postklist)")
+ (*List.find (\<lambda>x. k = entry_to_key env x) (preklist @ klist @ postklist) = none *)
+ (* this is the case in which there is no entry for the key k*)
+ apply (subgoal_tac "List.find (\<lambda>x. k = entry_to_key env x) klist = None")
+ apply simp
+  apply (simp add:listfind_append Let_def)
+   apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) preklist \<noteq> None",simp)
+    apply (simp add:listfind_append Let_def)
+    apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) klist \<noteq> None",simp+)
+
+ (* k is in klist: we just need to show that it is not in the first piece of the list *)
+ apply (rename_tac kentry)
+ apply (subgoal_tac "(k \<in> set (map (entry_to_key env) (preklist@klist@postklist)))")
+ defer
+  apply (simp add:find_Some_iff)
+  apply (erule exE)
+  apply (erule conjE)+
+  apply (simp add:nth_append)
+  
+  apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) klist")
+   apply (simp add:find_None_iff)
+   (* we need to show that klist is not empty and that k must be in it for cond_s* *)
+   apply (subgoal_tac "na > 0 \<longrightarrow> \<not>key_lt env k ((ab#list)!(na - 1))")
+   prefer 2
+     apply (case_tac "first (ab # list) (key_lt env k)")
+     (*first (ab # list) (key_lt env k) = None*)
+     apply (simp add:first_None_iff)
+     apply (erule conjE)+
+     apply (drule_tac t=na in sym)
+     apply simp
+     apply (subgoal_tac "(ab # list) ! length list \<in> set list")
+     apply force
+     apply (force intro:sorry_fixme)
+   
+     apply (simp add:first_def)
+     apply (case_tac "find_index (key_lt env k) (ab # list)",simp)
+     apply (simp add:find_index_Some_iff)
+
+   apply (case_tac na)
+    apply (subgoal_tac "key_lt env k ab")
+    prefer 2
+     apply (simp add:first_def find_index_def)
+     apply (case_tac " key_lt env k ab")
+      apply simp
+
+      apply simp
+      (* here the map Suc cannot return any index equal to 0*)
+      apply (force intro:sorry_fixme)
+    apply (simp add:cond_s1_def dd_def qq_def ss.simps)
+    apply (erule conjE)
+    apply (subgoal_tac "\<exists> x \<in> set klist .  k = entry_to_key env x")
+    apply simp
+    
+    (* solve "\<exists> x \<in> set klist .  k = entry_to_key env x"*)
+    (* this is true because klist is the first list that satisfies key_lt constraint *)
+    apply (force intro: sorry_fixme)
+    
+   apply (force intro: sorry_fixme)
+
+   apply simp
+   (* this is true for 
+entry_to_key env ` set klist \<inter> entry_to_key env ` (\<Union>x\<in>set ys. set (the (norm_entries_list_h s x h))) = {} \<Longrightarrow>
+       entry_to_key env ` (\<Union>x\<in>set xs. set (the (norm_entries_list_h s x h))) \<inter>
+       (entry_to_key env ` set klist \<union> entry_to_key env ` (\<Union>x\<in>set ys. set (the (norm_entries_list_h s x h)))) =
+       {}
+   *)
+   apply (force intro: sorry_fixme)
+oops
+
+lemma listfind_Suc_h_eq_listfind_h_if_ordered_keys1:
+"wf_env env \<Longrightarrow>
+ s r = Some (INode (I (ab # list, b))) \<Longrightarrow>
+ b \<noteq> [] \<Longrightarrow>
+ (Suc (length (ab # list))) = length b \<Longrightarrow>
+ Suc na \<le> length b \<Longrightarrow> 
+ 2 \<le> length b \<Longrightarrow>
+ n = Suc na \<Longrightarrow>
+ union_clause (the (ss (Some r) s (Suc h))) s r (Suc h) \<and>
+ cond_sj env (length b) b (ab # list) s h \<and>
+           cond_s1 env b (ab # list) s h \<and> cond_sn env (length b) b (ab # list) s h \<Longrightarrow>
+ (case first (ab # list) (key_lt env k) of None \<Rightarrow> length b | Some i \<Rightarrow> i) = Suc na \<Longrightarrow>
+ ((List.find (\<lambda>x. k = entry_to_key env x) (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b)))
+ =
+ (List.find (\<lambda>x. k = entry_to_key env x) ((case (norm_entries_list_h s (b!(n - Suc 0)) h) of None \<Rightarrow> fail | Some list \<Rightarrow> list) )))"
+(*FIXME I am assuming that norm_entries_list is sorted
+   this should appear as an hypothesis
+ *)
+apply (subgoal_tac "sorted_by (entry_lt env) (the (norm_entries_list_h s r (Suc h)))")
+defer
+ apply (force intro:sorry_fixme)
+apply (subgoal_tac "allDistinct (the (norm_entries_list_h s r (Suc h))) \<and> allDistinct (map (entry_to_key env) (the (norm_entries_list_h s r (Suc h))))")
+defer
+ apply (simp add:sorted_by_e_lt_allDistinct)
+
+apply (erule conjE)+
+apply simp
+apply (thin_tac "n=?x")
+apply (subgoal_tac "(the (norm_entries_list_h s r (Suc h)) = List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) b))")
+defer
+ apply (simp add:union_clause_def norm_entries_list_h_simps)
+ apply (case_tac "\<not>(\<forall>x\<in>set b. \<exists>y. norm_entries_list_h s x h = Some y)",simp+)
+ apply force
+
+apply (subgoal_tac "\<exists> klist. norm_entries_list_h s (b ! na) h = Some klist")
+ defer
+ apply (simp add:union_clause_def norm_entries_list_h_simps)
+ apply (case_tac "\<not>(\<forall>x\<in>set b. \<exists>y. norm_entries_list_h s x h = Some y)",simp+)
+apply (erule exE)
+apply simp
+
+apply (subgoal_tac "? x. b!na = x")
+defer
+ apply simp
+
+apply (erule exE)
+apply (subgoal_tac "? xs ys. (b = xs@x#ys)")
+ defer
+ apply (subgoal_tac "x \<in> set b")
+ apply (simp add:split_list)
+  apply (force)
+apply (erule exE)+
+apply simp
+
+apply (subgoal_tac "allDistinct (xs@x#ys)")
+defer
+ (*this is true because if there are two page ids directing to the same page in the store we would have duplicated entries*)
+ apply (force intro:sorry_fixme)
+
+apply (subgoal_tac "? preklist. (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) xs)) = preklist")
+defer
+ apply simp
+apply (erule exE)
+apply simp
+apply (subgoal_tac "? postklist. (List.concat (map (the \<circ> (\<lambda>q. norm_entries_list_h s q h)) ys)) = postklist")
+defer
+ apply simp
+apply (erule exE)
+apply simp
+apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) (preklist @ klist @ postklist)")
+ (*List.find (\<lambda>x. k = entry_to_key env x) (preklist @ klist @ postklist) = none *)
+ (* this is the case in which there is no entry for the key k*)
+ apply (subgoal_tac "List.find (\<lambda>x. k = entry_to_key env x) klist = None")
+ apply simp
+  apply (simp add:listfind_append Let_def)
+   apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) preklist \<noteq> None",simp)
+    apply (simp add:listfind_append Let_def)
+    apply (case_tac "List.find (\<lambda>x. k = entry_to_key env x) klist \<noteq> None",simp+)
+
+ (* k is in klist: we just need to show that it is not in the first piece of the list *)
+ apply (rename_tac kentry)
+ apply (subgoal_tac "(k \<in> set (map (entry_to_key env) (preklist@klist@postklist)))")
+ defer
+  apply (simp add:find_Some_iff)
+  apply (erule exE)
+  apply (erule conjE)+
+  apply (simp add:nth_append)
+
+ (* we need to know that k is smaller than a given key *)
+ apply (subgoal_tac "na > 0 \<longrightarrow> \<not>key_lt env k ((ab#list)!(na - 1))")
+ defer
+  apply (case_tac "first (ab # list) (key_lt env k)")
+   (*first (ab # list) (key_lt env k) = None*)
+   apply (simp add:first_None_iff)
+   apply (erule conjE)+
+   apply (drule_tac t=na in sym)
+   apply simp
+   apply (subgoal_tac "(ab # list) ! length list \<in> set list")
+   apply force
+    apply (force intro:sorry_fixme)
+   
+   apply (simp add:first_def)
+   apply (case_tac "find_index (key_lt env k) (ab # list)",simp)
+    apply (simp add:find_index_Some_iff)
+
+ apply simp
+ apply (subgoal_tac "\<not> (x \<in> set xs) \<and> \<not> (x \<in> set ys)")
+ defer
+  apply (force intro:sorry_fixme)
+
+ apply (erule conjE)+
+ apply (subgoal_tac "\<not> (k \<in> set (map (entry_to_key env) (preklist)))")
+ defer
+  apply (case_tac "na = 0")
+   apply (case_tac xs,simp+)
+
+   apply (case_tac "na < length xs + length ys")
+    apply simp
+    apply (force intro:sorry_fixme)
+
+    apply simp
+    apply (force intro:sorry_fixme)
+(*to remove before proceeding*)
+  apply simp
+  apply (case_tac "preklist=[]",simp)
+   (* preklist \<noteq> []*)
+   apply (subgoal_tac "\<exists> page_id_of_last_entrylist_of_preklist. (xs @ x # ys) ! (na - 1)= page_id_of_last_entrylist_of_preklist")
+   prefer 2
+    apply force
+   apply (erule exE)
+   apply simp
+   apply (subgoal_tac "\<exists> last_preklist. norm_entries_list_h s page_id_of_last_entrylist_of_preklist h = Some last_preklist")
+   prefer 2
+    apply (case_tac "norm_entries_list_h s page_id_of_last_entrylist_of_preklist h")
+     apply (simp add:union_clause_def norm_entries_list_h_simps)
+     apply (case_tac "\<not>(\<forall>x\<in>set xs \<union> set ys. \<exists>y. norm_entries_list_h s x h = Some y)")
+      apply simp
+
+      apply simp
+      (* this is true because page_id_of_last_entrylist_of_preklist belongs to xs*)
+      apply (force intro:sorry_fixme)
+    apply force
+   apply (erule exE)
+   apply (subgoal_tac "\<exists> preklist'. preklist = preklist'@last_preklist")
+   prefer 2
+    apply (force intro:sorry_fixme)
+  apply (erule exE)+
+  apply (simp add:cond_sj_def from_to_set qq_def)
+  apply (drule_tac x="na - Suc 0" in spec)
+  apply (simp add:ss.simps dd_def key_lte0_def)
+  apply (case_tac "na = 0")
+   apply simp
+   (* entries list must be composed by all distinct entries: here we have two klists!
+   allDistinct (preklist' @ klist @ klist @ postklist)
+   *)
+   apply (force intro:sorry_fixme)
+   
+   apply simp
+   apply rule+
+   apply (case_tac "Suc 0 \<le> na - Suc 0 \<and> na - Suc 0 \<le> length xs + length ys - Suc 0")
+    (* Suc 0 \<le> na - Suc 0 \<and> na - Suc 0 \<le> length xs + length ys - Suc 0 *)
+    apply simp
+    apply (erule conjE)+
+    (* at this point we know that k cannot be in last_preklist because the preconditions 
+
+     \<not> key_lt env k ((ab # list) ! (na - Suc 0)) 
+
+     \<forall>s\<in>set last_preklist. key_lt env (entry_to_key env s) ((ab # list) ! (na - Suc 0)) 
+    are not satisfied *)
+    apply (force intro:sorry_fixme)
+    
+    apply simp
+    (* impossible: if Suc 0 \<le> na - Suc 0 then preklist was empty *)
+    apply (force intro:sorry_fixme)
+(*end to remove *)
+
+ apply (subgoal_tac "\<not> (k \<in> set (map (entry_to_key env) (postklist)))")
+ defer
+  apply (force intro:sorry_fixme)
+
+ apply (subgoal_tac "k \<in> set (map (entry_to_key env) klist)")
+ defer
+  apply force
+
+ apply (simp add:listfind_append Let_def)
+ apply (subgoal_tac "List.find (\<lambda>x. k = entry_to_key env x) preklist = None")
+ defer
+  apply (force simp add:find_None_iff)
+
+ apply (simp add:listfind_append Let_def)
+ apply (case_tac " List.find (\<lambda>x. k = entry_to_key env x) klist = None")
+  apply (force simp add:find_None_iff)
+    
+  apply force
+oops  
 
 lemma listfind_Suc_h_eq_listfind_h_if_ordered_keys:
 "wf_env env \<Longrightarrow>
@@ -1287,7 +1704,7 @@ apply (case_tac "norm_entries_list_h s (b ! (n - Suc 0)) h")
         (* na < (length b - 1) *)
         apply (simp add:first_def,case_tac "find_index (key_lt env (entry_to_key env x)) (ab # list)",simp+)
         apply clarsimp
-        apply (simp add:allDistinct_concat')
+        apply (simp add:allDistinct_concat'
         (* now I need to show through cond_s1 and cond_sn that 
           \<forall>i'<na. \<not> key_lt env (entry_to_key env x) ((ab # list) ! i')
           does not hold
