@@ -1,0 +1,216 @@
+open import Pervasives Set_extra Assert_extra
+open import Abstract_btree
+
+
+let natStore = Store.Store (Map.insert (Store.Page_ref (1:nat)) (Store.Page (1:nat)) Map.empty)
+
+(*here we use a dummy P2f that returns every time a leaf frame. The
+type carried by the [page] should tell us if it is a internal node or
+a leaf node *)
+let natP2f = (fun (_:(Store.page nat)) -> (Frame.Frm_L(<|Frame.lf_kvs=[(Frame.Key 1,Frame.Value 1)]|>):Frame.frame nat nat nat))
+
+let natCtxt = <| Page2Frame.ctxt_p2f = Page2Frame.P2f natP2f|>
+
+let natBtreeLeaf = Btree.Tr_lf [(Frame.Key (1:nat), Frame.Value (1:nat))]
+
+let natBtreeInternal = Btree.Tr_nd ((1:nat),(fun _ -> Frame.Key (3:nat)),(fun n -> match n with | 0 -> (Btree.Tr_lf ([(Frame.Key (1:nat), Frame.Value (1:nat));(Frame.Key (2:nat), Frame.Value (2:nat))])) | _ -> Btree.Tr_lf ([(Frame.Key (3:nat),Frame.Value (3:nat))]) end))
+
+let natP2fInternal =
+  (fun (Store.Page (n:nat)) ->
+    (match n with
+     | 0 -> (* the internal frame *)
+        (Frame.Frm_I(
+             <|
+               Frame.nf_n=1;
+               Frame.nf_ks=(fun _ -> Frame.Key (3:nat));
+               Frame.nf_rs=(fun n -> (match n with 0 -> Store.Page_ref 1 | _ -> Store.Page_ref 2 end))
+             |>):Frame.frame nat nat nat)
+     | 1 -> (Frame.Frm_L(<|Frame.lf_kvs=[(Frame.Key (1:nat), Frame.Value (1:nat));(Frame.Key (2:nat), Frame.Value (2:nat))]|>):Frame.frame nat nat nat)
+     | _ -> (Frame.Frm_L(<|Frame.lf_kvs=[(Frame.Key (3:nat),Frame.Value (3:nat))]|>):Frame.frame nat nat nat)
+     end))
+
+let natCtxtInternal = <| Page2Frame.ctxt_p2f = Page2Frame.P2f natP2fInternal|>
+
+let natStoreInternal =
+  (Store.Store (Map.insert (Store.Page_ref (2:nat)) (Store.Page (2:nat))
+    (Map.insert (Store.Page_ref (1:nat)) (Store.Page (1:nat))
+                (Map.insert (Store.Page_ref (0:nat)) (Store.Page (0:nat)) Map.empty))))
+
+let checkJustBtreesHeight1Equal btree btree' = (
+    (*this op does not work if the height of the trees is bigger than 1 *)
+  match (btree,btree') with
+  | (Just (Btree.Tr_nd (n,ks,ts)), Just (Btree.Tr_nd (n',ks',ts'))) ->
+     (n=n'
+      &&
+        (List.map ks (Prelude.from_0_to (n-1)))=(List.map ks' (Prelude.from_0_to (n'-1)))
+      &&
+        (List.map ts (Prelude.from_0_to (n)))=(List.map ts' (Prelude.from_0_to (n')))
+     )
+  | (Just (Btree.Tr_lf kvs), Just (Btree.Tr_lf kvs')) -> kvs = kvs'
+  | _ -> false (* we do not admit both btrees are Nothing *) end)
+
+let (k2r:((Frame.node_frame nat nat -> Frame.key nat -> Store.page_ref nat))) = (fun _ _ -> Store.Page_ref (1:nat))
+
+let nf:(Frame.node_frame nat nat) = <|Frame.nf_n=1;Frame.nf_ks=(fun _ -> Frame.Key 1);Frame.nf_rs=(fun _ -> Store.Page_ref 1)|>
+
+let (natK2rInternal:((Frame.node_frame nat nat -> Frame.key nat -> Store.page_ref nat))) =
+  (fun _ _ -> Store.Page_ref (1:nat)) (* this is a dummy for now, it should do some choice on frame and key *)
+
+let (natCtxt1Internal:(KeyTo.ctxt1 nat nat nat nat)) =
+  <| KeyTo.ctxt1_page_to_frame = Page2Frame.P2f natP2fInternal;
+     KeyTo.ctxt1_key_to_ref  = KeyTo.K2r natK2rInternal;
+  |>
+
+let (natRootFindStateInternal:(Find.find_state nat nat nat nat)) =
+  Find.Fs_l <|
+      Find.fsl_k = Frame.Key (1:nat);
+      Find.fsl_r = Store.Page_ref (0:nat);
+      |>
+
+assert fs_step_invariant_true_with_fsr :
+  FindCorrectness.fs_step_invariant natCtxtInternal (natStoreInternal,( Find.Fs_r <|
+      Find.fsr_r = Store.Page_ref (1:nat);
+      Find.fsr_v = Just (Frame.Value 1);
+      |>)) 0 (Just(Frame.Value 1)) 
+
+assert fs_step_invariant_true_with_fsl :
+  FindCorrectness.fs_step_invariant natCtxtInternal (natStoreInternal,natRootFindStateInternal) 1 (Just(Frame.Value 1)) 
+
+
+assert wf_store_true_false :
+  WellFormedness.wf_store (Store.Store Map.empty) natCtxt1Internal 1 = false
+
+assert wf_store_true_test :
+  WellFormedness.wf_store natStoreInternal natCtxt1Internal 1 = true
+
+assert fs_step_as_fun_test :
+  let (_,fsr) = (Find.fs_step_as_fun natCtxt1Internal 1 (natStoreInternal, natRootFindStateInternal))
+  in
+  fsr
+  = ( Find.Fs_r <|
+      Find.fsr_r = Store.Page_ref (1:nat);
+      Find.fsr_v = Just (Frame.Value 1);
+      |>)
+
+assert fs_step_Just_Fs_r :
+    let fsr = (match (Find.fs_step natCtxt1Internal (natStoreInternal, Find.Fs_l <|
+      Find.fsl_k = Frame.Key (1:nat);
+      Find.fsl_r = Store.Page_ref (1:nat);
+      |>)) with Just (_,fsr) -> Just fsr | _ -> Nothing end)
+  in
+  fsr
+  = Just ( Find.Fs_r <|
+      Find.fsr_r = Store.Page_ref (1:nat);
+      Find.fsr_v = Just (Frame.Value 1);
+      |>)
+
+assert fs_step_Just_Fs_l :
+  let fsl = (match (Find.fs_step natCtxt1Internal (natStoreInternal, natRootFindStateInternal)) with Just (_,fsl) -> Just fsl | _ -> Nothing end)
+  in
+  fsl
+  = Just (Find.Fs_l <|
+      Find.fsl_k = Frame.Key (1:nat);
+      Find.fsl_r = Store.Page_ref (1:nat);
+      |>)
+
+assert fs_step_Nothing_for_page_ref_to_frame :
+  Find.fs_step natCtxt1Internal (natStore, Find.Fs_l <|
+      Find.fsl_k = Frame.Key (1:nat);
+      Find.fsl_r = Store.Page_ref (10:nat);
+      |>) = Nothing (* because we have a Fs_r *)
+
+assert fs_step_Nothing :
+  Find.fs_step natCtxt1Internal (natStore, Find.Fs_r <|
+      Find.fsr_r = Store.Page_ref (1:nat);
+      Find.fsr_v = Nothing;
+      |>) = Nothing (* because we have a Fs_r *)
+
+
+assert dest_key_to_ref_k2r :
+  ( ((KeyTo.dest_key_to_ref:KeyTo.key_to_ref nat nat nat nat ->
+    (Frame.node_frame nat nat -> Frame.key nat -> Store.page_ref nat)) (KeyTo.K2r k2r))
+    nf
+    (Frame.Key (1:nat))
+  =
+    k2r
+      nf
+      (Frame.Key (1:nat)))
+
+assert key_to_v_Just : KeyTo.key_to_v ((<|Frame.lf_kvs=[(Frame.Key 1,Frame.Value 1)]|>):Frame.leaf_frame nat nat) (Frame.Key 1) = Just (Frame.Value 1)
+
+assert key_to_v_Nothing : KeyTo.key_to_v ((<|Frame.lf_kvs=[(Frame.Key 1,Frame.Value 1)]|>):Frame.leaf_frame nat nat) (Frame.Key 10) = Nothing
+
+assert page_ref_key_to_v_Just : Btree.page_ref_key_to_v natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) (Frame.Key 1) 1 = Just (Frame.Value 1)
+
+assert page_ref_key_to_v_Nothing : Btree.page_ref_key_to_v natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) (Frame.Key 11) 1 = Nothing
+
+assert page_ref_to_map_Just : Btree.page_ref_to_map natCtxt natStore (Store.Page_ref (1:nat)) 0 =
+  Just (Map.fromList [(Frame.Key (1:nat), Frame.Value (1:nat))])
+
+assert page_ref_to_map_Nothing : Btree.page_ref_to_map natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 10 = Nothing
+
+assert kvs_to_map_empty : Btree.kvs_to_map ([]:(list (Frame.key nat * Frame.value nat))) = (Map.empty:Map.map (Frame.key nat) (Frame.value nat))
+
+assert page_ref_to_kvs_natBtreeInternal_wrong_height:
+  Btree.page_ref_to_kvs natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 11 =
+    Nothing
+
+assert page_ref_to_kvs_natBtreeInternal:
+  Btree.page_ref_to_kvs natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 1 =
+    Just [(Frame.Key (1:nat), Frame.Value (1:nat));(Frame.Key (2:nat), Frame.Value (2:nat));(Frame.Key (3:nat),Frame.Value (3:nat))]
+
+assert page_ref_to_btree_natBtreeInternal_wrong_page_ref :
+  Btree.page_ref_to_btree natCtxtInternal natStoreInternal (Store.Page_ref (11:nat)) 1 = Nothing
+
+assert page_ref_to_btree_natBtreeInternal_wrong_page_ref_for_height :
+  Btree.page_ref_to_btree natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 0 = Nothing
+
+assert page_ref_to_btree_natBtreeInternal_wrong_height :
+  Btree.page_ref_to_btree natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 10 = Nothing
+
+assert page_ref_to_btree_natBtreeInternal :
+  checkJustBtreesHeight1Equal (Btree.page_ref_to_btree natCtxtInternal natStoreInternal (Store.Page_ref (0:nat)) 1) (Just (natBtreeInternal))
+
+assert page_ref_to_btree_natBtreeLeaf_wrong_ref :
+  Btree.page_ref_to_btree natCtxt natStore (Store.Page_ref (2:nat)) 0 = Nothing
+
+assert page_ref_to_btree_natBtreeLeaf_wrong_height :
+  Btree.page_ref_to_btree natCtxt natStore (Store.Page_ref (1:nat)) 1 = Nothing
+
+assert page_ref_to_btree_natBtreeLeaf :
+  Btree.page_ref_to_btree natCtxt natStore (Store.Page_ref (1:nat)) 0 = Just (natBtreeLeaf)
+
+assert tree_to_kvs_returns_all_values_and_keys_of_internal_node :
+  Btree.btree_to_kvs natBtreeInternal = [(Frame.Key (1:nat), Frame.Value (1:nat));(Frame.Key (2:nat), Frame.Value (2:nat));(Frame.Key (3:nat),Frame.Value (3:nat))]
+
+assert tree_to_kvs_returns_all_values_and_keys_of_leaf_node :
+  Btree.btree_to_kvs natBtreeLeaf = [(Frame.Key (1:nat), Frame.Value (1:nat))]
+
+assert from_0_to_test : Prelude.from_0_to 2 = [(0:nat);1;2]
+
+assert page_ref_to_frame_testNothing : Page2Frame.page_ref_to_frame natCtxt natStore (Store.Page_ref (2:nat)) =
+                                  Nothing
+
+
+assert page_ref_to_frame_testJust : Page2Frame.page_ref_to_frame natCtxt natStore (Store.Page_ref (1:nat)) =
+                                  (Just (Frame.Frm_L(<|Frame.lf_kvs=[(Frame.Key 1,Frame.Value 1)]|>)))
+
+
+assert dest_value_from_value_1 : Frame.dest_value (Frame.Value (1:nat)) = 1
+
+assert dest_key_from_key_1: Frame.dest_key (Frame.Key (1:nat)) = 1
+
+assert ref_to_page_Nothing_from_natStore: Store.ref_to_page natStore (Store.Page_ref (2:nat)) = Nothing
+
+assert ref_to_page_page1_from_natStore: Store.ref_to_page natStore (Store.Page_ref (1:nat)) = Just (Store.Page 1)
+
+assert dest_store_of_nat2nat_map: Store.dest_store (Store.Store (Map.empty:(map (Store.page_ref nat) (Store.page nat)))) =
+                                    (Map.empty:(map (Store.page_ref nat) (Store.page nat)))
+
+assert dest_page_ref_of_nat_page_ref: Store.dest_page_ref (Store.Page_ref (1:nat)) = 1
+
+assert rresult_to_option_of_Ok: Prelude.rresult_to_option (Prelude.Ok (1:nat)) = Just 1
+
+assert rresult_to_option_of_Error: Prelude.rresult_to_option (Prelude.Error:Prelude.rresult nat) = Nothing
+
+assert rev_apply_of_sum_equal_to_sum: Prelude.rev_apply (1:nat) ((+) 1) = 2
