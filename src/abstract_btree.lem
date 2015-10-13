@@ -352,28 +352,45 @@ module WellFormedness = struct
   (tree_height) steps. If it points to a leaf node its n0 must be 0.*)
   let wf_store s0 ctxt1 tree_height =
     let all_page_refs = Map.domain (dest_store s0) in
+    let f0 = (fun f r0 ->
+        let maybe_frm  =
+          page_ref_to_frame (<|ctxt_p2f = ctxt1.ctxt1_page_to_frame|>) s0 r0
+        in
+        f maybe_frm)
+    in
     (match (Set.size all_page_refs) with
      (*an empty domain means a btree without root *)
      | 0 -> false
      (*a single page_ref means we have only the root node (that can
      contain an empty [kvs])*)
      | 1 ->
-        let f0 =
-          (fun r0 ->
-            let maybe_frm  =
-              page_ref_to_frame (<|ctxt_p2f = ctxt1.ctxt1_page_to_frame|>) s0 r0
-            in
+        let f1 = (fun maybe_frm ->
             (match maybe_frm with
              | Nothing -> false (* ctxt must be wf *)
              | Just (Frm_I _) -> false (* a single page_ref must point to a leaf frame *)
-             | Just (Frm_L _) -> true
+             | Just (Frm_L _) -> true (* FIXME constraint on the order of the kvs? *)
              end)
           )
         in
-        Set.all f0 all_page_refs
+        Set.all (f0 f1) all_page_refs
      (* many page_refs means we have inodes, so all page refs must
      point to a leaf frame, and we cannot have empty [kvs] *)
-     | _ -> true
+     | _ ->
+        let f1 = (fun maybe_frm ->
+            (match maybe_frm with
+             | Nothing -> false (* ctxt must be wf *)
+             | Just (Frm_I _) ->
+             (* each page_ref must point to a leaf frame -- how do we
+             prevent loops? by decreasing the store? Can be done, but
+             it is ineffiecient: we'd repeat most of the
+             computations. We can use the height instead: we can say
+             that at height 0, we must have a leaf. *)
+                true
+             | Just (Frm_L lf) -> not (List.null lf.lf_kvs) (* [kvs] must be not empty *)
+             end)
+          )
+        in
+        Set.all (f0 f1) all_page_refs
      end)
 end
 
