@@ -252,16 +252,67 @@ section "wellformedness predicates"
 
 (* FIXME obviously the following need to be filled in properly *)
 
-definition wf_ctxt:: "('bs,'k,'r,'v) ctxt => bool" where
-  "wf_ctxt ctxt == True"
+definition wf_store1:: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => tree_height => bool" where
+  "wf_store1 ctxt1 s0 r0 n0 ==
+  let s0_map = s0 |> dest_store  in
+    (* empty store = no btree *)
+    s0_map \<noteq> Map.empty
+    \<and>
+    (* r0 must be in store *)
+    r0 \<in> (dom s0_map)
+    \<and>
+    (* r0 must be the root of a btree of height n0*)
+    (* FIXME I would prefer to define store wf without using the page_ref_to_tree*)
+    ((page_ref_to_tree (ctxt.truncate ctxt1) s0 r0 n0) |> is_Some)
+    \<and>
+    True"
 
-definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt1 => bool" where
-  "wf_ctxt1 ctxt1 == True"
-
-definition wf_store:: "('r,'bs) store => tree_height => bool" where
-  "wf_store s0 n0 == True"
-
-
+fun wf_store:: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => tree_height => bool" where
+  "wf_store ctxt1 s0 r0 0 = (
+      case page_ref_to_frame (ctxt.truncate ctxt1) s0 r0 of 
+      None => False 
+      | Some frm => (
+        case frm of 
+        Frm_L(lf) => True
+        | _ => False))"
+  | "wf_store ctxt1 s0 r0 (Suc n') = (
+      case page_ref_to_frame (ctxt.truncate ctxt1) s0 r0 of
+      None => False  (* attempt to access missing page *)
+      | Some frm => (
+        case frm of 
+        Frm_I(nf) => (
+          let n = (nf|>nf_n) in
+          let ks = (nf|>nf_ks) :: (nat => 'k key) in
+          let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
+          let f0 = (% r. wf_store ctxt1 s0 r n') :: ('r page_ref => bool) in
+          let not_empty_frames =
+            let not_empty = (% r.
+              (case page_ref_to_frame (ctxt.truncate ctxt1) s0 r of
+              None => False  (* attempt to access missing page *)
+              | Some frm => (
+                case frm of 
+                  Frm_I(nf) => (nf|>nf_n) \<noteq> 0 (* this is not necessary *)
+                  | Frm_L(lf) => \<not> (lf|>lf_kvs|>List.null))))
+            in
+            n \<noteq> 0
+            \<and>
+            (! (m::nat). m <= n --> m |> rs |> not_empty)
+          in
+          let valid_ctxt1_key_to_ref =
+             let k2r :: (('r,'k) node_frame => 'k key => 'r page_ref)= (ctxt1 |> key_to_ref |> dest_key_to_ref) in
+             (! m < n.(\<exists> m' \<le> n .
+             (m|>ks|>k2r nf) = m'|>rs))
+          in
+          (* check that frames are not empty *)
+          not_empty_frames
+          \<and>
+          (* check that key_to_ref returns a ref in rs *)
+          valid_ctxt1_key_to_ref
+          \<and>
+          (* all subframes must be wf*)
+          (! (m::nat). m <= n --> m |> rs |> f0))
+        | Frm_L(_) => False))  (* found Frm_L but tree_height was not 0 *)
+  "
 
 section "correctness of fs_step"
 
@@ -287,7 +338,8 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
 
 lemma fs_step_is_invariant: "
   ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
-  wf_ctxt1 ctxt1 & wf_store s0 n0 
+  let r0 = (case fs0 of Fs_l fsl \<Rightarrow> fsl_r fsl | Fs_r fsr \<Rightarrow> fsr_r fsr) in
+  wf_store ctxt1 s0 r0 n0 
   --> (
   let ctxt = (ctxt.truncate ctxt1) in
   fs_step_invariant ctxt (s0,fs0) n0 v0 --> (
@@ -297,14 +349,13 @@ lemma fs_step_is_invariant: "
   | Some (s',fs') => (
     (* n0 could be 0? but then fs' is Fs_r? *)
     fs_step_invariant ctxt (s',fs') (n0 - 1) v0)))"
+  apply (simp add:Let_def)
   apply(rule)+
-  apply(elim conjE)
   apply(subgoal_tac "? x. fs_step ctxt1 (s0, fs0) = x")
    prefer 2
    apply(force intro: FIXME)
   apply(erule exE)
   apply(simp add: Let_def)
-  apply(rule)+
   apply(case_tac x)
    (* none *)
    apply(force)
