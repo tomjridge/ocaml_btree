@@ -219,7 +219,10 @@ record ('bs,'k,'r,'v) find_state_r =
 
 datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
 
-
+definition find_state_to_page_ref :: "('bs,'k,'r,'v) find_state => 'r page_ref" where
+  "find_state_to_page_ref fs0 = (case fs0 of
+    Fs_l fsl => (fsl|>fsl_r)
+    | Fs_r fsr => (fsr |> fsr_r))"
 
 definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
@@ -269,10 +272,37 @@ definition wf_ctxt:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
 definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
   "wf_ctxt1 ctxt1 == True"
 
-definition wf_store:: "('r,'bs) store => tree_height => bool" where
-  "wf_store s0 n0 == True"
+definition wf_store_page_ref_to_map_none :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store_page_ref_to_map_none  c1 s0 n0 r0 == (
+    let c0 = ctxt_p2f_t.truncate c1 in
+    ((page_ref_to_map c0 s0 r0 n0 = None) --> False)
+  )"
+
+definition wf_store_page_ref_to_map_some :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store_page_ref_to_map_some  c1 s0 n0 r0 == (
+    let c0 = ctxt_p2f_t.truncate c1 in
+(! m1 r' nf k0 . ((
+(page_ref_to_map c0 s0 r0 n0 = Some m1)
+& (page_ref_to_map c0 s0 r' (n0 - Suc 0) = None)
+& (dest_key_to_ref (c1|>key_to_ref) nf k0 = r')
+& (page_ref_to_frame c0 s0 r0 = Some (Frm_I nf))
+) --> False
+))    
+  )"
 
 
+definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store c1 s0 n0 r0 == (
+    wf_store_page_ref_to_map_none c1 s0 n0 r0
+    & wf_store_page_ref_to_map_some c1 s0 n0 r0
+
+& True)"
+
+(*
+
+  
+
+*)
 
 section "correctness of fs_step"
 
@@ -297,10 +327,10 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt_p2f_t
 
 
 lemma fs_step_is_invariant: "
-  ! (ctxt1::('bs,'k,'r,'v) ctxt_k2r_t) s0 fs0 n0 v0.
-  wf_ctxt1 ctxt1 & wf_store s0 n0 
+  ! (ctxt1::('bs,'k,'r,'v) ctxt_k2r_t) ctxt s0 fs0 n0 v0.
+  ((ctxt_p2f_t.truncate ctxt1) = ctxt)
+  --> wf_ctxt1 ctxt1 & wf_store ctxt1 s0 n0 (fs0|>find_state_to_page_ref)
   --> (
-  let ctxt = (ctxt_p2f_t.truncate ctxt1) in
   fs_step_invariant ctxt (s0,fs0) n0 v0 --> (
   let x = fs_step ctxt1 (s0,fs0) in
   case x of 
@@ -315,7 +345,6 @@ lemma fs_step_is_invariant: "
    apply(force)
   apply(erule exE)
   apply(simp add: Let_def)
-  apply(rule)+
   apply(case_tac x)
    (* none *)
    apply(force)
@@ -385,9 +414,9 @@ lemma fs_step_is_invariant: "
      apply(case_tac m0)
       (* m0 = None *)
       apply(simp)
-      (* FIXME this case ruled out by wellformedness - page_ref_to_map cannot be None *)
-      apply(force intro: FIXME)
-
+      (* this case ruled out by wellformedness - page_ref_to_map cannot be None *)
+      apply (metis find_state.simps(5) find_state_to_page_ref_def rev_apply_def wf_store_def wf_store_page_ref_to_map_none_def)
+      
       (* m0 = Some a *)
       apply(rename_tac m1)
       apply(simp)
@@ -398,7 +427,9 @@ lemma fs_step_is_invariant: "
       apply(simp)
       apply(case_tac "m0'")
        (* none - ruled out because m0 is_Some --> m0' is_Some *)
-       apply(force intro: FIXME)
+       apply(simp)
+       apply(simp add: wf_store_def wf_store_page_ref_to_map_some_def Let_def)
+       apply(force intro: FIXME)  (* sledgehammer should get this *)
 
        (* m0' = Some a *)
        apply(rename_tac "m1'")
