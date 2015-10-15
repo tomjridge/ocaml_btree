@@ -55,7 +55,7 @@ definition ref_to_page :: "('r,'bs) store => 'r page_ref => 'bs page option" whe
   "ref_to_page s0 r0 == (s0|>dest_store) r0"
 
 
-section "key and frame"
+section "key and frame, (leaf_frame) key_to_v"
 
 
 datatype 'k key = Key 'k
@@ -79,6 +79,10 @@ record ('k,'v) leaf_frame =
   lf_kvs :: "('k key * 'v value_t) list" (* slightly different to paper - we store ks in tree *) 
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
+
+definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
+  "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
+
 
 
 section "page and frame, page_to_frame, ctxt_p2f"
@@ -170,7 +174,7 @@ definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store => 
 
 
 
-section "(given node_frame) key_to_ref, key_to_v, ctxt_k2r_t"
+section "(given node_frame) key_to_ref, ctxt_k2r_t"
 
 
 
@@ -186,9 +190,6 @@ returned page ref identifies the relevant subtree.
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
 (* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
 
-definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
-  "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
-
 definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
   "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
 
@@ -203,7 +204,7 @@ record  ('bs,'k,'r,'v) ctxt_k2r_t =  "('bs,'k,'r,'v) ctxt_p2f_t" +
 (*  key_to_v :: "('bs,'k,'r,'v) key_to_v" *)
 
 
-section "find"
+section "find, find_state, fs_step"
 
 (* find *)
 record ('bs,'k,'r,'v) find_state_l =
@@ -311,7 +312,7 @@ lemma fs_step_is_invariant: "
   apply(elim conjE)
   apply(subgoal_tac "? x. fs_step ctxt1 (s0, fs0) = x")
    prefer 2
-   apply(force intro: FIXME)
+   apply(force)
   apply(erule exE)
   apply(simp add: Let_def)
   apply(rule)+
@@ -323,7 +324,7 @@ lemma fs_step_is_invariant: "
    apply(simp)
    apply(subgoal_tac "? s' fs'. a=(s',fs')")
     prefer 2
-    apply(force intro: FIXME)
+    apply(force)
    apply(erule exE)+
    apply(simp)
    apply(simp add: fs_step_def)
@@ -347,7 +348,7 @@ lemma fs_step_is_invariant: "
     apply(case_tac frm')
      (**********)
      (* frm' = Frm_I node_frame_ext *)
-     apply(rename_tac nf)
+     apply(rename_tac nf)  (* nf = node_frame *)
      apply(simp)
      apply(elim conjE)
      apply(drule_tac s=s0 in sym)
@@ -403,7 +404,7 @@ lemma fs_step_is_invariant: "
        apply(rename_tac "m1'")
        apply(simp)
        apply(thin_tac "m0'=?x")
-       (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref *)
+       (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref, and page_ref_to_map Suc *)
        apply(force intro:FIXME)
 
 
@@ -444,43 +445,51 @@ lemma fs_step_is_invariant: "
      apply(case_tac m0)
       (* m0 = None *)
       apply(simp)
-      (* the map at r0 is none ; but we have a leaf frame; contradiction *)
+      (* the map at r0 is none ; but we have a leaf frame; contradiction; FIXME the following should be simplified *)
+      (*
       apply(simp add: page_ref_to_frame_def)
       apply(case_tac "ref_to_page s0 r0") apply(force)
       apply(simp)
       apply(rename_tac p0)
+      *)
       (*  ref_to_page s0 r0 = Some p0 *)
       apply(simp add: page_ref_to_map_def)
       apply(case_tac "page_ref_to_kvs (ctxt_p2f_t.truncate ctxt1) s0 r0 n0") 
-       (* none *)
+       (* page_ref_to_kvs = none *)
        apply(simp)
-       apply(simp add: ref_to_page_def)
+       (* apply(simp add: ref_to_page_def) *)
        apply(simp add: page_ref_to_kvs_def)
        apply(simp add: rev_apply_def)
        apply(case_tac "page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0")
-        (* none *)
+        (* page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0 = none *)
         (* page_ref_to_tree defined by primrec *)
         apply(case_tac n0)
+         apply(force)
+         (*
          apply(simp)
          apply(simp add: page_ref_to_frame_def)
          apply(force simp add: ref_to_page_def rev_apply_def)
+         *)
 
          (* n0 = suc nat *)
          apply(rename_tac n0')
          apply(simp)
          apply(simp add: page_ref_to_frame_def)
          apply(simp add: ref_to_page_def rev_apply_def)
+         apply(case_tac "dest_store s0 r0") apply(force) apply(simp)
+         apply(rename_tac p0)
          (* this case should be impossible because n0 was not 0, but we got a leaf ; by wf of store *)
          apply(force intro:FIXME)
+        (* end page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0 = none *)
 
         (* page_ref_to_tree = Some a *)
         apply(rename_tac t0)
-         apply(case_tac n0)
-          apply(force)
+        apply(case_tac n0)
+         apply(force)
 
-          (* n0 = suc nat *)
-          apply(rename_tac n0')
-          apply(force)
+         (* n0 = suc nat *)
+         apply(rename_tac n0')
+         apply(force)
 
        (* page_ref_to_kvs = Some a *)
        apply(rename_tac kvs)
