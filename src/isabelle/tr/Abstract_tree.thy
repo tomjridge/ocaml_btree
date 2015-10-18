@@ -55,7 +55,7 @@ definition ref_to_page :: "('r,'bs) store => 'r page_ref => 'bs page option" whe
   "ref_to_page s0 r0 == (s0|>dest_store) r0"
 
 
-section "key and frame"
+section "key and frame, (leaf_frame) key_to_v"
 
 
 datatype 'k key = Key 'k
@@ -80,8 +80,12 @@ record ('k,'v) leaf_frame =
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
+definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
+  "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
-section "page and frame"
+
+
+section "page and frame, page_to_frame, ctxt_p2f"
 
 (* interpretation of pages *)
 datatype ('bs,'k,'r,'v) page_to_frame = P2f "'bs page => ('r,'k,'v) frame"  (* note that this forces that the page internally stores its type; this is not necessary, but is used by step_find *)
@@ -91,11 +95,11 @@ definition dest_p2f :: "('bs,'k,'r,'v) page_to_frame => 'bs page => ('r,'k,'v) f
 
 (**********)
 (* to convert a page_ref to a frame, lookup the page option and use the above *)
-record  ('bs,'k,'r,'v) ctxt =
+record  ('bs,'k,'r,'v) ctxt_p2f_t =
   ctxt_p2f :: "('bs,'k,'r,'v) page_to_frame"
 
 (* from this point, we don't duplicate 0/Suc defns, to minimize # of defns *)
-definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store =>  'r page_ref => ('r,'k,'v) frame option" where
+definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store =>  'r page_ref => ('r,'k,'v) frame option" where
   "page_ref_to_frame c0 s0 r0 == (
     case ref_to_page s0 r0 of
     None => (Error |> rresult_to_option)  (* invalid page access *)
@@ -124,7 +128,7 @@ termination  (* tree_to_kvs_dom is not right here - the function package seems c
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
-fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k,'v) tree option" where
+fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k,'v) tree option" where
   "page_ref_to_tree c0 s0 r0 0 = (
       case page_ref_to_frame c0 s0 r0 of 
       None => (Error |> rresult_to_option) 
@@ -149,7 +153,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref =
         | Frm_L(_) => (Error |> rresult_to_option)))"  (* found Frm_L but tree_height was not 0 *)
 
 (* notice that this ideally belongs in section "page and frame" *)
-definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v value_t) list option" where
+definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v value_t) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
   |> (% x. case x of
@@ -159,25 +163,32 @@ definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r pag
 definition kvs_to_map :: "('k key*'v value_t) list => ('k key ~=> 'v value_t)" where
   "kvs_to_map kvs == (map_of kvs)"
 
-definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v value_t) option" where
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v value_t) option" where
   "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
 
-definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt => ('r,'bs) store => 'r page_ref => 'k key => tree_height => 'v value_t option" where
-  "page_ref_key_to_v ctxt s0 r0 k0 n0 == (
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store => 'r page_ref => tree_height =>'k key => 'v value_t option" where
+  "page_ref_key_to_v ctxt s0 r0 n0 k0 == (
     let m0 = page_ref_to_map ctxt s0 r0 n0 in
     Option.bind m0 (% m. m k0))"
 
 
 
 
-section "key_to_ref, key_to_v"
+section "(given node_frame) key_to_ref, ctxt_k2r_t"
 
-(* NB we need some properties of these functions for correctness *)
+
+
+
+(* NB we need some properties of these functions for correctness 
+
+This abstracts from the particular find implementation. Essentially, at a non-leaf node, we need to map
+a key to a page ref, from which we can continue the find. The property this function should have is
+that, given a key, if there is a value corresponding to the key (which is unique), then the 
+returned page ref identifies the relevant subtree.
+
+*)
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
 (* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
-
-definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
-  "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
 definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
   "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
@@ -188,12 +199,12 @@ definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k
 *)
 
 (**********)
-record  ('bs,'k,'r,'v) ctxt1 =  "('bs,'k,'r,'v) ctxt" +
+record  ('bs,'k,'r,'v) ctxt_k2r_t =  "('bs,'k,'r,'v) ctxt_p2f_t" +
   key_to_ref :: "('bs,'k,'r,'v) key_to_ref"
 (*  key_to_v :: "('bs,'k,'r,'v) key_to_v" *)
 
 
-section "find"
+section "find, find_state, fs_step"
 
 (* find *)
 record ('bs,'k,'r,'v) find_state_l =
@@ -208,9 +219,12 @@ record ('bs,'k,'r,'v) find_state_r =
 
 datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
 
+definition find_state_to_page_ref :: "('bs,'k,'r,'v) find_state => 'r page_ref" where
+  "find_state_to_page_ref fs0 = (case fs0 of
+    Fs_l fsl => (fsl|>fsl_r)
+    | Fs_r fsr => (fsr |> fsr_r))"
 
-
-definition fs_step :: "('bs,'k,'r,'v) ctxt1
+definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) option" where
   "fs_step ctxt1 s0fs0 == (
@@ -219,7 +233,7 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt1
   Fs_l fsl => (
     let r0 = (fsl|>fsl_r) in
     let k0 = (fsl|>fsl_k) in
-    case (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0) of 
+    case (page_ref_to_frame (ctxt_p2f_t.truncate ctxt1) s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
       case frm of 
@@ -239,7 +253,7 @@ section "fs_step as a function"
 text "iterate the fs_step function n times"
 
 (* FIXME in the following we may want to use a standard isabelle while construction *)
-definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt1 
+definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt_k2r_t 
   => tree_height
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state)" where
@@ -252,71 +266,47 @@ section "wellformedness predicates"
 
 (* FIXME obviously the following need to be filled in properly *)
 
-definition wf_store1:: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => tree_height => bool" where
-  "wf_store1 ctxt1 s0 r0 n0 ==
-  let s0_map = s0 |> dest_store  in
-    (* empty store = no btree *)
-    s0_map \<noteq> Map.empty
-    \<and>
-    (* r0 must be in store *)
-    r0 \<in> (dom s0_map)
-    \<and>
-    (* r0 must be the root of a btree of height n0*)
-    (* FIXME I would prefer to define store wf without using the page_ref_to_tree*)
-    ((page_ref_to_tree (ctxt.truncate ctxt1) s0 r0 n0) |> is_Some)
-    \<and>
-    True"
+definition wf_ctxt:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
+  "wf_ctxt ctxt == True"
 
-fun wf_store:: "('bs,'k,'r,'v) ctxt1 => ('r,'bs) store => 'r page_ref => tree_height => bool" where
-  "wf_store ctxt1 s0 r0 0 = (
-      case page_ref_to_frame (ctxt.truncate ctxt1) s0 r0 of 
-      None => False 
-      | Some frm => (
-        case frm of 
-        Frm_L(lf) => True
-        | _ => False))"
-  | "wf_store ctxt1 s0 r0 (Suc n') = (
-      case page_ref_to_frame (ctxt.truncate ctxt1) s0 r0 of
-      None => False  (* attempt to access missing page *)
-      | Some frm => (
-        case frm of 
-        Frm_I(nf) => (
-          let n = (nf|>nf_n) in
-          let ks = (nf|>nf_ks) :: (nat => 'k key) in
-          let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
-          let f0 = (% r. wf_store ctxt1 s0 r n') :: ('r page_ref => bool) in
-          let not_empty_frames =
-            let not_empty = (% r.
-              (case page_ref_to_frame (ctxt.truncate ctxt1) s0 r of
-              None => False  (* attempt to access missing page *)
-              | Some frm => (
-                case frm of 
-                  Frm_I(nf) => (nf|>nf_n) \<noteq> 0 (* this is not necessary *)
-                  | Frm_L(lf) => \<not> (lf|>lf_kvs|>List.null))))
-            in
-            n \<noteq> 0
-            \<and>
-            (! (m::nat). m <= n --> m |> rs |> not_empty)
-          in
-          let valid_ctxt1_key_to_ref =
-             let k2r :: (('r,'k) node_frame => 'k key => 'r page_ref)= (ctxt1 |> key_to_ref |> dest_key_to_ref) in
-             (! m < n.(\<exists> m' \<le> n .
-             (m|>ks|>k2r nf) = m'|>rs))
-          in
-          (* check that frames are not empty *)
-          not_empty_frames
-          \<and>
-          (* check that key_to_ref returns a ref in rs *)
-          valid_ctxt1_key_to_ref
-          \<and>
-          (* all subframes must be wf*)
-          (! (m::nat). m <= n --> m |> rs |> f0))
-        | Frm_L(_) => False))  (* found Frm_L but tree_height was not 0 *)
-  "
+definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
+  "wf_ctxt1 ctxt1 == True"
+
+definition wf_store_page_ref_to_map_none :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store_page_ref_to_map_none  c1 s0 n0 r0 == (
+    let c0 = ctxt_p2f_t.truncate c1 in
+    ((page_ref_to_map c0 s0 r0 n0 = None) --> False)
+  )"
+
+definition wf_store_page_ref_to_map_some :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store_page_ref_to_map_some  c1 s0 n0 r0 == (
+    let c0 = ctxt_p2f_t.truncate c1 in
+(! m1 r' nf k0 . ((
+(page_ref_to_map c0 s0 r0 n0 = Some m1)
+& (page_ref_to_map c0 s0 r' (n0 - Suc 0) = None)
+& (dest_key_to_ref (c1|>key_to_ref) nf k0 = r')
+& (page_ref_to_frame c0 s0 r0 = Some (Frm_I nf))
+) --> False
+))    
+  )"
+
+
+definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store c1 s0 n0 r0 == (
+    wf_store_page_ref_to_map_none c1 s0 n0 r0
+    & wf_store_page_ref_to_map_some c1 s0 n0 r0
+
+& True)"
+
+(*
+
+  
+
+*)
 
 section "correctness of fs_step"
 
-definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt 
+definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt_p2f_t
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state)
   => tree_height
   => 'v value_t option
@@ -327,7 +317,7 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
     Fs_l fsl => (
       let k0 = (fsl|>fsl_k) in
       let r0 = (fsl|>fsl_r) in
-      let v' = page_ref_key_to_v ctxt s0 r0 k0 n0 in
+      let v' = page_ref_key_to_v ctxt s0 r0 n0 k0 in
       v' = v0)
     | Fs_r fsr => (
       let v' = (fsr|>fsr_v) in
@@ -337,11 +327,10 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt
 
 
 lemma fs_step_is_invariant: "
-  ! (ctxt1::('bs,'k,'r,'v) ctxt1) s0 fs0 n0 v0.
-  let r0 = (case fs0 of Fs_l fsl \<Rightarrow> fsl_r fsl | Fs_r fsr \<Rightarrow> fsr_r fsr) in
-  wf_store ctxt1 s0 r0 n0 
+  ! (ctxt1::('bs,'k,'r,'v) ctxt_k2r_t) ctxt s0 fs0 n0 v0.
+  ((ctxt_p2f_t.truncate ctxt1) = ctxt)
+  --> wf_ctxt1 ctxt1 & wf_store ctxt1 s0 n0 (fs0|>find_state_to_page_ref)
   --> (
-  let ctxt = (ctxt.truncate ctxt1) in
   fs_step_invariant ctxt (s0,fs0) n0 v0 --> (
   let x = fs_step ctxt1 (s0,fs0) in
   case x of 
@@ -349,11 +338,11 @@ lemma fs_step_is_invariant: "
   | Some (s',fs') => (
     (* n0 could be 0? but then fs' is Fs_r? *)
     fs_step_invariant ctxt (s',fs') (n0 - 1) v0)))"
-  apply (simp add:Let_def)
   apply(rule)+
+  apply(elim conjE)
   apply(subgoal_tac "? x. fs_step ctxt1 (s0, fs0) = x")
    prefer 2
-   apply(force intro: FIXME)
+   apply(force)
   apply(erule exE)
   apply(simp add: Let_def)
   apply(case_tac x)
@@ -364,7 +353,7 @@ lemma fs_step_is_invariant: "
    apply(simp)
    apply(subgoal_tac "? s' fs'. a=(s',fs')")
     prefer 2
-    apply(force intro: FIXME)
+    apply(force)
    apply(erule exE)+
    apply(simp)
    apply(simp add: fs_step_def)
@@ -379,16 +368,16 @@ lemma fs_step_is_invariant: "
    apply(subgoal_tac "? k0. (fsl|>fsl_k) = k0 ")
     prefer 2 apply(force)
    apply(erule exE)+
-   apply(case_tac " (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0)")
+   apply(case_tac " (page_ref_to_frame (ctxt_p2f_t.truncate ctxt1) s0 r0)")
     apply(force)
 
-    (*  (page_ref_to_frame (ctxt.truncate ctxt1) s0 r0) = Some r' *)
+    (*  (page_ref_to_frame (ctxt_p2f_t.truncate ctxt1) s0 r0) = Some r' *)
     apply(rename_tac frm')
     apply(simp)
     apply(case_tac frm')
      (**********)
      (* frm' = Frm_I node_frame_ext *)
-     apply(rename_tac nf)
+     apply(rename_tac nf)  (* nf = node_frame *)
      apply(simp)
      apply(elim conjE)
      apply(drule_tac s=s0 in sym)
@@ -418,33 +407,35 @@ lemma fs_step_is_invariant: "
      apply(simp add: rev_apply_def)
      apply(simp add: page_ref_key_to_v_def)
      (* page_ref_to_map could be none or some *)
-     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0) = m0")
+     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt_p2f_t.truncate ctxt1) s0 r0 n0) = m0")
       prefer 2 apply(force)
      apply(erule exE)
      apply(simp)
      apply(case_tac m0)
       (* m0 = None *)
       apply(simp)
-      (* FIXME this case ruled out by wellformedness - page_ref_to_map cannot be None *)
-      apply(force intro: FIXME)
-
+      (* this case ruled out by wellformedness - page_ref_to_map cannot be None *)
+      apply (metis find_state.simps(5) find_state_to_page_ref_def rev_apply_def wf_store_def wf_store_page_ref_to_map_none_def)
+      
       (* m0 = Some a *)
       apply(rename_tac m1)
       apply(simp)
       apply(thin_tac "m0 = ?x")
-      apply(subgoal_tac "? m0'.  (page_ref_to_map (ctxt.truncate ctxt1) s0 r' (n0 - Suc 0)) = m0'")
+      apply(subgoal_tac "? m0'.  (page_ref_to_map (ctxt_p2f_t.truncate ctxt1) s0 r' (n0 - Suc 0)) = m0'")
        prefer 2 apply(force)
       apply(erule exE)
       apply(simp)
       apply(case_tac "m0'")
        (* none - ruled out because m0 is_Some --> m0' is_Some *)
-       apply(force intro: FIXME)
+       apply(simp)
+       apply(simp add: wf_store_def wf_store_page_ref_to_map_some_def Let_def)
+       apply(force intro: FIXME)  (* sledgehammer should get this *)
 
        (* m0' = Some a *)
        apply(rename_tac "m1'")
        apply(simp)
        apply(thin_tac "m0'=?x")
-       (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref *)
+       (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref, and page_ref_to_map Suc *)
        apply(force intro:FIXME)
 
 
@@ -478,50 +469,58 @@ lemma fs_step_is_invariant: "
      apply(simp add: rev_apply_def)
      apply(simp add: page_ref_key_to_v_def)
      (* page_ref_to_map could be none or some *)
-     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt.truncate ctxt1) s0 r0 n0) = m0")
+     apply(subgoal_tac "? m0. (page_ref_to_map (ctxt_p2f_t.truncate ctxt1) s0 r0 n0) = m0")
       prefer 2 apply(force)
      apply(erule exE)
      apply(simp)
      apply(case_tac m0)
       (* m0 = None *)
       apply(simp)
-      (* the map at r0 is none ; but we have a leaf frame; contradiction *)
+      (* the map at r0 is none ; but we have a leaf frame; contradiction; FIXME the following should be simplified *)
+      (*
       apply(simp add: page_ref_to_frame_def)
       apply(case_tac "ref_to_page s0 r0") apply(force)
       apply(simp)
       apply(rename_tac p0)
+      *)
       (*  ref_to_page s0 r0 = Some p0 *)
       apply(simp add: page_ref_to_map_def)
-      apply(case_tac "page_ref_to_kvs (ctxt.truncate ctxt1) s0 r0 n0") 
-       (* none *)
+      apply(case_tac "page_ref_to_kvs (ctxt_p2f_t.truncate ctxt1) s0 r0 n0") 
+       (* page_ref_to_kvs = none *)
        apply(simp)
-       apply(simp add: ref_to_page_def)
+       (* apply(simp add: ref_to_page_def) *)
        apply(simp add: page_ref_to_kvs_def)
        apply(simp add: rev_apply_def)
-       apply(case_tac "page_ref_to_tree (ctxt.truncate ctxt1) s0 r0 n0")
-        (* none *)
+       apply(case_tac "page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0")
+        (* page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0 = none *)
         (* page_ref_to_tree defined by primrec *)
         apply(case_tac n0)
+         apply(force)
+         (*
          apply(simp)
          apply(simp add: page_ref_to_frame_def)
          apply(force simp add: ref_to_page_def rev_apply_def)
+         *)
 
          (* n0 = suc nat *)
          apply(rename_tac n0')
          apply(simp)
          apply(simp add: page_ref_to_frame_def)
          apply(simp add: ref_to_page_def rev_apply_def)
+         apply(case_tac "dest_store s0 r0") apply(force) apply(simp)
+         apply(rename_tac p0)
          (* this case should be impossible because n0 was not 0, but we got a leaf ; by wf of store *)
          apply(force intro:FIXME)
+        (* end page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0 = none *)
 
         (* page_ref_to_tree = Some a *)
         apply(rename_tac t0)
-         apply(case_tac n0)
-          apply(force)
+        apply(case_tac n0)
+         apply(force)
 
-          (* n0 = suc nat *)
-          apply(rename_tac n0')
-          apply(force)
+         (* n0 = suc nat *)
+         apply(rename_tac n0')
+         apply(force)
 
        (* page_ref_to_kvs = Some a *)
        apply(rename_tac kvs)
