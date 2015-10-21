@@ -569,10 +569,26 @@ lemma fs_step_is_invariant: "
        apply(force)
   done
 
+section "frame_to_page, ctxt_f2p"
+
+(* encoding of pages *)
+datatype ('bs,'k,'r,'v) frame_to_page = F2p "('r,'k,'v) frame \<Rightarrow> 'bs page"
+
+definition dest_f2p :: "('bs,'k,'r,'v) frame_to_page => ('r,'k,'v) frame \<Rightarrow> 'bs page" where
+  "dest_f2p x = (case x of F2p f => f)"
+
+record ('bs,'k,'r,'v) ctxt_f2p_t = "('bs,'k,'r,'v) ctxt_k2r_t" +
+  ctxt_f2p :: "('bs,'k,'r,'v) frame_to_page"
+  
 section "insert, insert_state, insert_step"
 
-record ('bs,'k,'r,'v) ctxt_max_t = "('bs,'k,'r,'v) ctxt_k2r_t" +
-  maxNumValues :: nat
+record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
+  maxNumValues  :: nat
+  free_page_ref :: "('r,'bs) store \<Rightarrow> 'r page_ref" (* need to constraint this so that the returned page_ref is not in the store *)
+  (* I need an interface that alters Fr_I *)
+  new_nf :: "('r,'k) node_frame"
+  add_key_nf :: "nat"
+  add_page_ref_nf :: "'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
 
 (* insert *)
 record ('k,'r,'v) insert_state_t =
@@ -584,24 +600,37 @@ datatype ('k,'r,'v) insert_state =
   | Is_insert_nonfull "('k,'r,'v) insert_state_t"
   | Is_done
 
-definition is_step :: "('bs,'k,'r,'v) ctxt_max_t
+definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
+  => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame)) 
+  => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame))" where
+  "split_child ctxt s0is0 = s0is0" (*FIXME*)
+
+
+definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('k,'r,'v) insert_state) 
   => (('r,'bs) store * ('k,'r,'v) insert_state) option" where
   "is_step ctxt s0is0 = (
   let (s0,is0) = s0is0 in
+  let ctxt_f2p = ctxt_f2p_t.truncate ctxt in
+  let ctxt_k2r = ctxt_k2r_t.truncate ctxt_f2p in
+  let ctxt_p2f = ctxt_p2f_t.truncate ctxt_k2r in
   case is0 of
     Is_root is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
-    (case (page_ref_to_frame (ctxt_p2f_t.truncate (ctxt_k2r_t.truncate ctxt)) s0 r0) of 
+    (case (page_ref_to_frame ctxt_p2f s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
       case (frm_to_n frm = (ctxt |> maxNumValues)) of
-       True \<Rightarrow> 
+       True \<Rightarrow>
        (* root is full, we need to create a new root *)
-       (* FIXME here we need to allocate a new internal node, and do a split *)
-       Some (Is_insert_nonfull is)
-       | False \<Rightarrow> Some (Is_insert_nonfull is)))
+       let r0' = (ctxt |> free_page_ref) s0 in
+       let nf_r = (ctxt |> new_nf) in
+       (* the old root node is a child *)
+       let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
+       let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
+       Some (s1, Is_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
+       | False \<Rightarrow> Some (s0,Is_insert_nonfull is)))
   | Is_insert_nonfull is \<Rightarrow> None
   | Is_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Is_done *)
 
