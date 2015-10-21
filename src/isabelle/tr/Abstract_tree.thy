@@ -80,6 +80,9 @@ record ('k,'v) leaf_frame =
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
+definition frm_to_n :: "('r,'k,'v) frame \<Rightarrow> nat" where
+  "frm_to_n frm = (case frm of Frm_I nf \<Rightarrow> nf |> nf_n | Frm_L lf \<Rightarrow> lf |> lf_kvs |> length)"
+
 definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
   "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
@@ -565,5 +568,41 @@ lemma fs_step_is_invariant: "
        apply(rename_tac n0')
        apply(force)
   done
+
+section "insert, insert_state, insert_step"
+
+record ('bs,'k,'r,'v) ctxt_max_t = "('bs,'k,'r,'v) ctxt_k2r_t" +
+  maxNumValues :: nat
+
+(* insert *)
+record ('k,'r,'v) insert_state_t =
+  ist_kv :: "('k key * 'v value_t)"
+  ist_r  :: "'r page_ref"
+
+datatype ('k,'r,'v) insert_state =
+    Is_root "('k,'r,'v) insert_state_t" (* case in which root is full and we create a new root *)
+  | Is_insert_nonfull "('k,'r,'v) insert_state_t"
+  | Is_done
+
+definition is_step :: "('bs,'k,'r,'v) ctxt_max_t
+  => (('r,'bs) store * ('k,'r,'v) insert_state) 
+  => (('r,'bs) store * ('k,'r,'v) insert_state) option" where
+  "is_step ctxt s0is0 = (
+  let (s0,is0) = s0is0 in
+  case is0 of
+    Is_root is \<Rightarrow>
+    let r0 = (is|>ist_r) in
+    let (k0,v0) = (is|>ist_kv) in
+    (case (page_ref_to_frame (ctxt_p2f_t.truncate (ctxt_k2r_t.truncate ctxt)) s0 r0) of 
+    None => (Error |> rresult_to_option)  (* invalid page access *)
+    | Some frm => (
+      case (frm_to_n frm = (ctxt |> maxNumValues)) of
+       True \<Rightarrow> 
+       (* root is full, we need to create a new root *)
+       (* FIXME here we need to allocate a new internal node, and do a split *)
+       Some (Is_insert_nonfull is)
+       | False \<Rightarrow> Some (Is_insert_nonfull is)))
+  | Is_insert_nonfull is \<Rightarrow> None
+  | Is_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Is_done *)
 
 end
