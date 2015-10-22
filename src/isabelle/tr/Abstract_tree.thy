@@ -590,6 +590,15 @@ record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
   add_key_nf :: "nat"
   add_page_ref_nf :: "'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
 
+fun ins :: "('k * 'v) \<Rightarrow> ('k * 'v) list \<Rightarrow> ('k * 'v) list" where
+  "ins kv [] = [kv]"
+  | "ins kv (kv'#kvs) =
+    (if (fst kv) = (fst kv')
+    (* update entry *)
+    then kv#kvs
+    else kv'#(ins kv kvs))
+  "
+
 (* insert *)
 record ('k,'r,'v) insert_state_t =
   ist_kv :: "('k key * 'v value_t)"
@@ -611,14 +620,16 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('k,'r,'v) insert_state) option" where
   "is_step ctxt s0is0 = (
   let (s0,is0) = s0is0 in
-  let ctxt_f2p = ctxt_f2p_t.truncate ctxt in
-  let ctxt_k2r = ctxt_k2r_t.truncate ctxt_f2p in
-  let ctxt_p2f = ctxt_p2f_t.truncate ctxt_k2r in
+  let ctxt_f2p_r = (ctxt_f2p_t.truncate ctxt) in
+  let f2p = (ctxt_f2p_r |> ctxt_f2p |> dest_f2p) in
+  let ctxt_k2r_r = ctxt_k2r_t.truncate ctxt_f2p_r in
+  let k2r = ((ctxt_k2r_r|>key_to_ref)|>dest_key_to_ref) in
+  let ctxt_p2f_r = ctxt_p2f_t.truncate ctxt_k2r_r in
   case is0 of
     Is_root is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
-    (case (page_ref_to_frame ctxt_p2f s0 r0) of 
+    (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
       case (frm_to_n frm = (ctxt |> maxNumValues)) of
@@ -628,10 +639,39 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
        let nf_r = (ctxt |> new_nf) in
        (* the old root node is a child *)
        let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
+       (* split_child updates the store with the new (page_ref, page)*)
        let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
        Some (s1, Is_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
        | False \<Rightarrow> Some (s0,Is_insert_nonfull is)))
-  | Is_insert_nonfull is \<Rightarrow> None
+  | Is_insert_nonfull is \<Rightarrow>
+    let r0 = (is|>ist_r) in
+    let (k0,v0) = (is|>ist_kv) in
+    (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
+    None => (Error |> rresult_to_option)  (* invalid page access *)
+    | Some frm => ( 
+      case frm of
+      Frm_L lf \<Rightarrow>
+      (* in a leaf we just update the list of entries with the new one *)
+      let frm' = Frm_L \<lparr> lf_kvs = ins (k0,v0) (lf |> lf_kvs) \<rparr> in
+      (* and we update the store *)
+      let s1 = Store ((dest_store s0) (r0 \<mapsto> (f2p frm'))) in
+      Some (s1, Is_done)
+      | Frm_I nf \<Rightarrow>
+      (* we need to find the child containing k0 *)
+      let r' = k2r nf k0 in
+      (* we resolve the child *)
+      (case (page_ref_to_frame ctxt_p2f_r s0 r0) of
+      None => (Error |> rresult_to_option)  (* invalid page access *)
+    | Some child_frm => (
+      case (frm_to_n child_frm = (ctxt |> maxNumValues)) of
+       True \<Rightarrow>
+       (* the child is full: we need to split it *)
+       let (s1,(_,nf'),_) = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
+       (* split changed the parent frame, so we need to look for the child containing k0 again *)
+       let r'' = k2r nf' k0 in
+       Some (s1,Is_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
+       | False \<Rightarrow> Some (s0,Is_insert_nonfull(is\<lparr> ist_r := r'\<rparr>)))
+       )))
   | Is_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Is_done *)
 
 end
