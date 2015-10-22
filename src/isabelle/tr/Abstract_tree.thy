@@ -630,7 +630,7 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
       (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
       (* we update the parent node with z *)
       let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we add the median key (i.e. the first key of the kvs_2) of lf*)
+      (* we copy the median key (i.e. the first key of the kvs_2) of lf*)
       (* NB: if we are splitting nodes (in is_step) they cannot be empty, so hd cannot be undefined *)
       let x_nf' = (ctxt |> add_key_nf ) (fst (hd kvs_2)) x_nf in
       ((x_r,x_nf'),(y_r,(Frm_L \<lparr> lf_kvs = kvs_1 \<rparr>)),(z_r,(Frm_L \<lparr> lf_kvs = kvs_2 \<rparr>)))
@@ -643,14 +643,14 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
       let z_nf = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [(n div 2)+1..< n] in
       (* we copy the page_refs in the new node z *)
       let z_nf = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) z_nf [(n div 2 + 1)..< n + 1] in
-      (* we delete the largest keys from y *)
+      (* we delete the largest keys from y (i.e. we create a new nf with the smallest keys) *)
       let y_nf' = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [0..<(n div 2)] in
       (* we delete the page_refs in z from y *)
       let y_nf' = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) y_nf' [0..<(n div 2 + 1)] in
       (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
       (* we update the parent node with z *)
       let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we add the median key (i.e. the first key of the kvs_2) of lf*)
+      (* we move the median key (i.e. the first key of the kvs_2) of lf*)
       let x_nf' = (ctxt |> add_key_nf) median_key x_nf in
       ((x_r,x_nf'),(y_r,(Frm_I y_nf')),(z_r,(Frm_I z_nf))))
   in
