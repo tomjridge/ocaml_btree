@@ -587,7 +587,8 @@ record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
   free_page_ref :: "('r,'bs) store \<Rightarrow> 'r page_ref" (* need to constraint this so that the returned page_ref is not in the store *)
   (* I need an interface that alters Fr_I *)
   new_nf :: "('r,'k) node_frame"
-  add_key_nf :: "nat"
+  (*add_key_nf should also update the nf_n field of the node_frame *)
+  add_key_nf :: "'k key \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
   add_page_ref_nf :: "'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
 
 fun ins :: "('k * 'v) \<Rightarrow> ('k * 'v) list \<Rightarrow> ('k * 'v) list" where
@@ -609,16 +610,63 @@ datatype ('k,'r,'v) insert_state =
   | Is_insert_nonfull "('k,'r,'v) insert_state_t"
   | Is_done
 
-
 definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame)) 
   => (('r,'bs) store * ('r,'k) node_frame)" where
 (* NB: having a node_frame in the result allows us to spare a READ to disk (although likely that data would be in the cache) *)
   "split_child ctxt c0 = (
-  let (s0, (x_r,x_frm),(y_r,y_frm)) = c0 in
+  let (s0, (x_r,x_nf),(y_r,y_frm)) = c0 in
+  (* we need to allocate a new node *)
   let z_r = (ctxt |> free_page_ref) s0 in
-  
-  (s0,x_frm)) (*FIXME*)
+  let f2p = ((ctxt_f2p_t.truncate ctxt) |> ctxt_f2p |> dest_f2p) in
+  (case y_frm of
+    Frm_L y_lf \<Rightarrow>
+    let kvs = y_lf |> lf_kvs in
+    (* second half of the entries *)
+    let kvs_2 = (drop ((length kvs) div 2) kvs) in
+    (* first half of the entries *)
+    let kvs_1 = (take ((length kvs) div 2) kvs) in
+    (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
+    (* we update the parent node with z *)
+    let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
+    (* we add the median key (i.e. the first key of the kvs_2) of lf*)
+    (* NB: if we are splitting nodes (in is_step) they cannot be empty, so hd cannot be undefined *)
+    let x_nf' = (ctxt |> add_key_nf ) (fst (hd kvs_2)) x_nf in
+    (* we update the store *)
+     (* the new frame contains the second half of the entries *)
+    let s1 = Store ((dest_store s0) (z_r \<mapsto> (f2p (Frm_L \<lparr> lf_kvs = kvs_2 \<rparr>)))) in
+     (* the old frame contains the first half of the entries *)
+    let s2 = Store ((dest_store s1) (y_r \<mapsto> (f2p (Frm_L \<lparr> lf_kvs = kvs_1 \<rparr>)))) in
+     (* the parent frame got the median key and the new page_ref *)
+    let s3 = Store ((dest_store s2) (x_r \<mapsto> (f2p (Frm_I x_nf')))) in
+    (s3,x_nf')
+  | Frm_I y_nf \<Rightarrow>
+    let n  = (y_nf|>nf_n)  in
+    let ks = (y_nf|>nf_ks) in
+    let rs = (y_nf|>nf_rs) :: (nat => 'r page_ref) in
+    let median_key = ks (n div 2) in
+    (* we copy the largest keys in the new node z, the median key is excluded though (it is going in the parent )*)
+    let z_nf = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [(n div 2)+1..< n] in
+    (* we copy the page_refs in the new node z *)
+    let z_nf = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) z_nf [(n div 2 + 1)..< n + 1] in
+    (* we delete the largest keys from y *)
+    let y_nf' = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [0..<(n div 2)] in
+    (* we delete the page_refs in z from y *)
+    let y_nf' = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) y_nf' [0..<(n div 2 + 1)] in
+    (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
+    (* we update the parent node with z *)
+    let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
+    (* we add the median key (i.e. the first key of the kvs_2) of lf*)
+    (* NB: if we are splitting nodes (in is_step) they cannot be empty, so hd cannot be undefined *)
+    let x_nf' = (ctxt |> add_key_nf) median_key x_nf in
+    (* we update the store *)
+     (* the new frame contains the second half of the entries *)
+    let s1 = Store ((dest_store s0) (z_r \<mapsto> (f2p (Frm_I z_nf)))) in
+     (* the old frame contains the first half of the entries *)
+    let s2 = Store ((dest_store s1) (y_r \<mapsto> (f2p (Frm_I y_nf')))) in
+     (* the parent frame got the median key and the new page_ref *)
+    let s3 = Store ((dest_store s2) (x_r \<mapsto> (f2p (Frm_I x_nf')))) in
+    (s3,x_nf')))
   "
 
 definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
