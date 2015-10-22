@@ -609,11 +609,15 @@ datatype ('k,'r,'v) insert_state =
   | Is_insert_nonfull "('k,'r,'v) insert_state_t"
   | Is_done
 
+
 definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame)) 
-  => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame))" where
-  "split_child ctxt s0is0 = s0is0" (*FIXME*)
-
+  => (('r,'bs) store * ('r,'k) node_frame)" where
+(* NB: having a node_frame in the result allows us to spare a READ to disk (although likely that data would be in the cache) *)
+  "split_child ctxt c0 = (
+  let (s0, (x_r,x_frm),(y_r,y_frm)) = c0 in
+  (s0,x_frm)) (*FIXME*)
+  "
 
 definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('k,'r,'v) insert_state) 
@@ -666,7 +670,7 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
       case (frm_to_n child_frm = (ctxt |> maxNumValues)) of
        True \<Rightarrow>
        (* the child is full: we need to split it *)
-       let (s1,(_,nf'),_) = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
+       let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
        (* split changed the parent frame, so we need to look for the child containing k0 again *)
        let r'' = k2r nf' k0 in
        Some (s1,Is_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
