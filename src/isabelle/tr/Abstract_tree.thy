@@ -80,8 +80,8 @@ record ('k,'v) leaf_frame =
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
-definition frm_to_n :: "('r,'k,'v) frame \<Rightarrow> nat" where
-  "frm_to_n frm = (case frm of Frm_I nf \<Rightarrow> nf |> nf_n | Frm_L lf \<Rightarrow> lf |> lf_kvs |> length)"
+definition frm_to_values_number :: "('r,'k,'v) frame \<Rightarrow> nat" where
+  "frm_to_values_number frm = (case frm of Frm_I nf \<Rightarrow> (nf |> nf_n) + 1 | Frm_L lf \<Rightarrow> lf |> lf_kvs |> length)"
 
 definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
   "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
@@ -616,6 +616,8 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
 (* NB: having a node_frame in the result allows us to spare a READ to disk (although likely that data would be in the cache) *)
   "split_child ctxt c0 = (
   let (s0, (x_r,x_frm),(y_r,y_frm)) = c0 in
+  let z_r = (ctxt |> free_page_ref) s0 in
+  
   (s0,x_frm)) (*FIXME*)
   "
 
@@ -636,7 +638,7 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
     (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
-      case (frm_to_n frm = (ctxt |> maxNumValues)) of
+      case (frm_to_values_number frm = (ctxt |> maxNumValues)) of
        True \<Rightarrow>
        (* root is full, we need to create a new root *)
        let r0' = (ctxt |> free_page_ref) s0 in
@@ -667,7 +669,7 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
       (case (page_ref_to_frame ctxt_p2f_r s0 r0) of
       None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some child_frm => (
-      case (frm_to_n child_frm = (ctxt |> maxNumValues)) of
+      case (frm_to_values_number child_frm = (ctxt |> maxNumValues)) of
        True \<Rightarrow>
        (* the child is full: we need to split it *)
        let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
