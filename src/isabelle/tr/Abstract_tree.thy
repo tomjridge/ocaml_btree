@@ -226,7 +226,7 @@ definition find_state_to_page_ref :: "('bs,'k,'r,'v) find_state => 'r page_ref" 
 
 definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
-  => (('r,'bs) store * ('bs,'k,'r,'v) find_state) option" where
+  => (('bs,'k,'r,'v) find_state) option" where
   "fs_step ctxt1 s0fs0 == (
   let (s0,fs0) = s0fs0 in
   case fs0 of
@@ -240,11 +240,11 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
       Frm_I nf => (
         let k2r = ((ctxt1|>key_to_ref)|>dest_key_to_ref) in
         let r' = k2r nf k0 in
-        Some(s0, Fs_l (fsl (| fsl_r := r' |))))
+        Some(Fs_l (fsl (| fsl_r := r' |))))
       | Frm_L lf => (
         let k2v = key_to_v in
         let v = k2v lf k0 in
-        Some(s0, Fs_r (| fsr_r = r0, fsr_v = v |)))))
+        Some(Fs_r (| fsr_r = r0, fsr_v = v |)))))
   | Fs_r fsr => (Error |> rresult_to_option))"  (* attempt to step Fs_r *)
 
 
@@ -256,10 +256,11 @@ text "iterate the fs_step function n times"
 definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt_k2r_t 
   => tree_height
   => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
-  => (('r,'bs) store * ('bs,'k,'r,'v) find_state)" where
+  => (('bs,'k,'r,'v) find_state)" where
   "fs_step_as_fun ctxt1 n0 s0fs0 == (
-  let f0 = % x. x |> (fs_step ctxt1) |> dest_Some in
-  (f0^^n0) s0fs0)"
+  let (s0,fs0) = s0fs0 in
+  let f0 = % x. (s0,x) |> (fs_step ctxt1) |> dest_Some in
+  (Nat.funpow n0 f0) fs0)"
 
 
 section "wellformedness predicates"
@@ -270,31 +271,52 @@ definition wf_ctxt:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
   "wf_ctxt ctxt == True"
 
 definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
-  "wf_ctxt1 ctxt1 == True"
+  "wf_ctxt1 ctxt1 == 
+  ! s0 r0 ctxt nf k0 r' v0 n0 m1 m1'.
+(ctxt_p2f_t.truncate ctxt1 = ctxt)
+(* if r0 is not a leaf *)
+& (page_ref_to_frame ctxt s0 r0 = Some (Frm_I nf))
+(* and the map exists at r0 *)
+& (page_ref_to_map ctxt s0 r0 n0 = Some m1)
+(* and we descend to r' *)
+& (dest_key_to_ref (key_to_ref ctxt1) nf k0 = r')
+(* and the map exists at r' *)
+& (page_ref_to_map ctxt s0 r' (n0 - Suc 0) = Some m1')
+(* then the maps agree, at least for the key *)
+& (m1 k0 = v0)
+--> (m1' k0 = v0)
+"
 
+
+(*
 definition wf_store_page_ref_to_map_none :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
   "wf_store_page_ref_to_map_none  c1 s0 n0 r0 == (
     let c0 = ctxt_p2f_t.truncate c1 in
     ((page_ref_to_map c0 s0 r0 n0 = None) --> False)
   )"
+*)
 
-definition wf_store_page_ref_to_map_some :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
-  "wf_store_page_ref_to_map_some  c1 s0 n0 r0 == (
+definition wf_store_page_ref_to_map :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+  "wf_store_page_ref_to_map  c1 s0 n0 r0 == (
     let c0 = ctxt_p2f_t.truncate c1 in
 (! m1 r' nf k0 . ((
+(* if we have a map at r0 *)
 (page_ref_to_map c0 s0 r0 n0 = Some m1)
-& (page_ref_to_map c0 s0 r' (n0 - Suc 0) = None)
-& (dest_key_to_ref (c1|>key_to_ref) nf k0 = r')
 & (page_ref_to_frame c0 s0 r0 = Some (Frm_I nf))
+(* and we follow the key to r' *)
+& (dest_key_to_ref (c1|>key_to_ref) nf k0 = r')
+(* then we still have a map *)
+& (page_ref_to_map c0 s0 r' (n0 - Suc 0) = None)
 ) --> False
-))    
+))  (* FIXME does this follow from page_ref_to_map ~= None? FIXME isn't this a basic property of the defn of page_ref_to_map/page_ref_to_tree? *)
+& (page_ref_to_map c0 s0 r0 n0 ~= None)    
   )"
 
 
 definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
   "wf_store c1 s0 n0 r0 == (
-    wf_store_page_ref_to_map_none c1 s0 n0 r0
-    & wf_store_page_ref_to_map_some c1 s0 n0 r0
+(*    wf_store_page_ref_to_map_none c1 s0 n0 r0 *)
+    wf_store_page_ref_to_map c1 s0 n0 r0
 
 & True)"
 
@@ -323,9 +345,8 @@ definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt_p2f_t
       let v' = (fsr|>fsr_v) in
       v' = v0))"
 
-
-
-
+(* FIXME in the following we want to eliminate n0 and v0 explicit arguments, and phrase as a
+simple invariant; v0 can be a parameter of the invariant; how do we get n0? just say I v0 == ! n0. wf_store s0 n0... --> *)
 lemma fs_step_is_invariant: "
   ! (ctxt1::('bs,'k,'r,'v) ctxt_k2r_t) ctxt s0 fs0 n0 v0.
   ((ctxt_p2f_t.truncate ctxt1) = ctxt)
@@ -335,9 +356,9 @@ lemma fs_step_is_invariant: "
   let x = fs_step ctxt1 (s0,fs0) in
   case x of 
   None => True  (* if we are at a Fs_r, no further facts are available *)
-  | Some (s',fs') => (
+  | Some (fs') => (
     (* n0 could be 0? but then fs' is Fs_r? *)
-    fs_step_invariant ctxt (s',fs') (n0 - 1) v0)))"
+    fs_step_invariant ctxt (s0,fs') (n0 - 1) v0)))"
   apply(rule)+
   apply(elim conjE)
   apply(subgoal_tac "? x. fs_step ctxt1 (s0, fs0) = x")
@@ -351,11 +372,7 @@ lemma fs_step_is_invariant: "
 
    (* x = Some a *)
    apply(simp)
-   apply(subgoal_tac "? s' fs'. a=(s',fs')")
-    prefer 2
-    apply(force)
-   apply(erule exE)+
-   apply(simp)
+   apply(rename_tac "fs'")
    apply(simp add: fs_step_def)
    apply(case_tac fs0)
     prefer 2
@@ -379,11 +396,6 @@ lemma fs_step_is_invariant: "
      (* frm' = Frm_I node_frame_ext *)
      apply(rename_tac nf)  (* nf = node_frame *)
      apply(simp)
-     apply(elim conjE)
-     apply(drule_tac s=s0 in sym)
-     apply(simp)
-     apply(thin_tac "s' = s0")
-     apply(thin_tac "a = ?x")
      apply(thin_tac "fs0 = ?x")
      apply(thin_tac "frm' = ?x")
      apply(thin_tac "x=?x")
@@ -415,7 +427,7 @@ lemma fs_step_is_invariant: "
       (* m0 = None *)
       apply(simp)
       (* this case ruled out by wellformedness - page_ref_to_map cannot be None *)
-      apply (metis find_state.simps(5) find_state_to_page_ref_def rev_apply_def wf_store_def wf_store_page_ref_to_map_none_def)
+      apply (metis find_state.simps(5) find_state_to_page_ref_def rev_apply_def wf_store_def wf_store_page_ref_to_map_def)
       
       (* m0 = Some a *)
       apply(rename_tac m1)
@@ -426,27 +438,28 @@ lemma fs_step_is_invariant: "
       apply(erule exE)
       apply(simp)
       apply(case_tac "m0'")
-       (* none - ruled out because m0 is_Some --> m0' is_Some *)
+       (* none - ruled out because m0 is_Some --> m0' is_Some ; FIXME sledgehammer should get this *)
        apply(simp)
-       apply(simp add: wf_store_def wf_store_page_ref_to_map_some_def Let_def)
-       apply(force intro: FIXME)  (* sledgehammer should get this *)
+       apply(simp add: wf_store_def wf_store_page_ref_to_map_def Let_def)
+       apply(elim conjE)
+       apply(erule exE)
+       apply(simp add: page_ref_to_map_def page_ref_to_kvs_def rev_apply_def find_state_to_page_ref_def)
+       apply(elim exE conjE)
+       apply(simp)
+       apply (metis option.distinct(1))  
 
        (* m0' = Some a *)
        apply(rename_tac "m1'")
        apply(simp)
        apply(thin_tac "m0'=?x")
        (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref, and page_ref_to_map Suc *)
-       apply(force intro:FIXME)
+       apply(simp add: wf_ctxt1_def)
+       apply(force)
 
 
      (* frm' = Frm_L leaf_frame_ext - easy case? *)
      apply(rename_tac lf)
      apply(simp)
-     apply(elim conjE)
-     apply(drule_tac s=s0 in sym)
-     apply(simp)
-     apply(thin_tac "s' = s0")
-     apply(thin_tac "a = ?x")
      apply(thin_tac "fs0 = ?x")
      apply(thin_tac "frm' = ?x")
      apply(thin_tac "x=?x")
@@ -466,7 +479,7 @@ lemma fs_step_is_invariant: "
      apply(simp)
      apply(thin_tac "fsr' = ?x")
      apply(simp)
-     apply(simp add: rev_apply_def)
+     apply(simp (no_asm) add: rev_apply_def)
      apply(simp add: page_ref_key_to_v_def)
      (* page_ref_to_map could be none or some *)
      apply(subgoal_tac "? m0. (page_ref_to_map (ctxt_p2f_t.truncate ctxt1) s0 r0 n0) = m0")
@@ -509,8 +522,16 @@ lemma fs_step_is_invariant: "
          apply(simp add: ref_to_page_def rev_apply_def)
          apply(case_tac "dest_store s0 r0") apply(force) apply(simp)
          apply(rename_tac p0)
-         (* this case should be impossible because n0 was not 0, but we got a leaf ; by wf of store *)
-         apply(force intro:FIXME)
+         (* this case should be impossible because n0 was not 0, but we got a leaf ; by wf of store; sledgehammer should get this *)
+         apply(simp add: wf_store_def wf_store_page_ref_to_map_def)
+         apply(erule conjE)
+         apply(erule exE)
+         apply(rename_tac m2)
+         apply(simp add: page_ref_to_map_def page_ref_to_kvs_def Let_def)
+         apply(simp add: find_state_to_page_ref_def page_ref_to_frame_def)
+         apply(simp add: ref_to_page_def)
+         apply(simp add: rev_apply_def)
+         apply(force simp add: rresult_to_option_def)  (* sledgehammer should get this *)
         (* end page_ref_to_tree (ctxt_p2f_t.truncate ctxt1) s0 r0 n0 = none *)
 
         (* page_ref_to_tree = Some a *)
