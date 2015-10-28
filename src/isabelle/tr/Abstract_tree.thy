@@ -582,6 +582,8 @@ record ('bs,'k,'r,'v) ctxt_f2p_t = "('bs,'k,'r,'v) ctxt_k2r_t" +
   
 section "insert, insert_state, insert_step"
 
+type_synonym 'r root_p_ref = "'r page_ref"
+
 record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
   maxNumValues  :: nat
   free_page_ref :: "('r,'bs) store \<Rightarrow> ('r page_ref * ('r,'bs) store)" (* need to constraint this so that the returned page_ref is not in the store *)
@@ -664,10 +666,10 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   (s3,x_nf'))"
 
 definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
-  => (('r,'bs) store * ('k,'r,'v) insert_state) 
-  => (('r,'bs) store * ('k,'r,'v) insert_state) option" where
+  => (('r,'bs) store * 'r root_p_ref * ('k,'r,'v) insert_state) 
+  => (('r,'bs) store * 'r root_p_ref * ('k,'r,'v) insert_state) option" where
   "ist_step ctxt s0is0 = (
-  let (s0,is0) = s0is0 in
+  let (s0,root,is0) = s0is0 in
   let ctxt_f2p_r = (ctxt_f2p_t.truncate ctxt) in
   let f2p = (ctxt_f2p_r |> ctxt_f2p |> dest_f2p) in
   let ctxt_k2r_r = ctxt_k2r_t.truncate ctxt_f2p_r in
@@ -677,20 +679,23 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
     Ist_root is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
+    (* we require a new root in order to have the data of 
+    both the tree with the new entry and the old tree without it *)
+    let (r0',s0) = (ctxt |> free_page_ref) s0 in
     (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
     | Some frm => (
       case (frm_to_values_number frm = (ctxt |> maxNumValues)) of
        True \<Rightarrow>
        (* root is full, we need to create a new root *)
-       let (r0',s0) = (ctxt |> free_page_ref) s0 in
        let nf_r = (ctxt |> new_nf) in
        (* the old root node is a child *)
        let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
        (* split_child updates the store with the new (page_ref, page)*)
        let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
-       Some (s1, Ist_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
-       | False \<Rightarrow> Some (s0,Ist_insert_nonfull is)))
+       Some (s1,r0',Ist_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
+       | False \<Rightarrow>
+       Some (s0,r0',Ist_insert_nonfull is)))
   | Ist_insert_nonfull is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
@@ -703,7 +708,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
         let frm' = Frm_L \<lparr> lf_kvs = ins (k0,v0) (lf |> lf_kvs) \<rparr> in
         (* and we update the store *)
         let s1 = Store ((dest_store s0) (r0 \<mapsto> (f2p frm'))) in
-        Some (s1, Ist_done)
+        Some (s1,root,Ist_done)
       | Frm_I nf \<Rightarrow>
         (* we need to find the child containing k0 *)
         let r' = k2r nf k0 in
@@ -717,8 +722,8 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
             let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
             (* split changed the parent frame, so we need to look for the child containing k0 again *)
             let r'' = k2r nf' k0 in
-            Some (s1,Ist_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
-          | False \<Rightarrow> Some (s0,Ist_insert_nonfull(is\<lparr> ist_r := r'\<rparr>)))
+            Some (s1,root,Ist_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
+          | False \<Rightarrow> Some (s0,root,Ist_insert_nonfull(is\<lparr> ist_r := r'\<rparr>)))
        )))
   | Ist_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Ist_done *)
 
