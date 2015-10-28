@@ -584,7 +584,7 @@ section "insert, insert_state, insert_step"
 
 record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
   maxNumValues  :: nat
-  free_page_ref :: "('r,'bs) store \<Rightarrow> 'r page_ref" (* need to constraint this so that the returned page_ref is not in the store *)
+  free_page_ref :: "('r,'bs) store \<Rightarrow> ('r page_ref * ('r,'bs) store)" (* need to constraint this so that the returned page_ref is not in the store *)
   (* I need an interface that alters Fr_I *)
   new_nf :: "('r,'k) node_frame"
   (*add_key_nf should also update the nf_n field of the node_frame *)
@@ -617,7 +617,7 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   "split_child ctxt c0 = (
   let (s0, (x_r,x_nf),(y_r,y_frm)) = c0 in
   (* we need to allocate a new node *)
-  let z_r = (ctxt |> free_page_ref) s0 in
+  let (z_r,s0) = (ctxt |> free_page_ref) s0 in
   let f2p = ((ctxt_f2p_t.truncate ctxt) |> ctxt_f2p |> dest_f2p) in
   let ((x_r,x_nf'),(y_r,y_frm'),(z_r,z_frm)) = 
     (case y_frm of
@@ -683,7 +683,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
       case (frm_to_values_number frm = (ctxt |> maxNumValues)) of
        True \<Rightarrow>
        (* root is full, we need to create a new root *)
-       let r0' = (ctxt |> free_page_ref) s0 in
+       let (r0',s0) = (ctxt |> free_page_ref) s0 in
        let nf_r = (ctxt |> new_nf) in
        (* the old root node is a child *)
        let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
