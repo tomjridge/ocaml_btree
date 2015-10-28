@@ -606,9 +606,9 @@ record ('k,'r,'v) insert_state_t =
   ist_r  :: "'r page_ref"
 
 datatype ('k,'r,'v) insert_state =
-    Is_root "('k,'r,'v) insert_state_t" (* case in which root is full and we create a new root *)
-  | Is_insert_nonfull "('k,'r,'v) insert_state_t"
-  | Is_done
+    Ist_root "('k,'r,'v) insert_state_t" (* case in which root is full and we create a new root *)
+  | Ist_insert_nonfull "('k,'r,'v) insert_state_t"
+  | Ist_done
 
 definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame)) 
@@ -630,8 +630,8 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
       (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
       (* we update the parent node with z *)
       let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we copy the median key (i.e. the first key of the kvs_2) of lf*)
-      (* NB: if we are splitting nodes (in is_step) they cannot be empty, so hd cannot be undefined *)
+      (* we *copy* the median key (i.e. the first key of the kvs_2) of lf*)
+      (* NB: if we are splitting nodes (in ist_step) they cannot be empty, so hd cannot be undefined *)
       let x_nf' = (ctxt |> add_key_nf ) (fst (hd kvs_2)) x_nf in
       ((x_r,x_nf'),(y_r,(Frm_L \<lparr> lf_kvs = kvs_1 \<rparr>)),(z_r,(Frm_L \<lparr> lf_kvs = kvs_2 \<rparr>)))
     | Frm_I y_nf \<Rightarrow>
@@ -650,7 +650,7 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
       (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
       (* we update the parent node with z *)
       let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we move the median key (i.e. the first key of the kvs_2) of lf*)
+      (* we *move* the median key (i.e. the first key of the kvs_2) of y_nf *)
       let x_nf' = (ctxt |> add_key_nf) median_key x_nf in
       ((x_r,x_nf'),(y_r,(Frm_I y_nf')),(z_r,(Frm_I z_nf))))
   in
@@ -663,10 +663,10 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   let s3 = Store ((dest_store s2) (x_r \<mapsto> (f2p (Frm_I x_nf')))) in
   (s3,x_nf'))"
 
-definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
+definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
   => (('r,'bs) store * ('k,'r,'v) insert_state) 
   => (('r,'bs) store * ('k,'r,'v) insert_state) option" where
-  "is_step ctxt s0is0 = (
+  "ist_step ctxt s0is0 = (
   let (s0,is0) = s0is0 in
   let ctxt_f2p_r = (ctxt_f2p_t.truncate ctxt) in
   let f2p = (ctxt_f2p_r |> ctxt_f2p |> dest_f2p) in
@@ -674,7 +674,7 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
   let k2r = ((ctxt_k2r_r|>key_to_ref)|>dest_key_to_ref) in
   let ctxt_p2f_r = ctxt_p2f_t.truncate ctxt_k2r_r in
   case is0 of
-    Is_root is \<Rightarrow>
+    Ist_root is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
     (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
@@ -689,9 +689,9 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
        let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
        (* split_child updates the store with the new (page_ref, page)*)
        let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
-       Some (s1, Is_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
-       | False \<Rightarrow> Some (s0,Is_insert_nonfull is)))
-  | Is_insert_nonfull is \<Rightarrow>
+       Some (s1, Ist_insert_nonfull(is\<lparr> ist_r := r0'\<rparr>))
+       | False \<Rightarrow> Some (s0,Ist_insert_nonfull is)))
+  | Ist_insert_nonfull is \<Rightarrow>
     let r0 = (is|>ist_r) in
     let (k0,v0) = (is|>ist_kv) in
     (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
@@ -699,27 +699,31 @@ definition is_step :: "('bs,'k,'r,'v) ctxt_insert_t
     | Some frm => ( 
       case frm of
       Frm_L lf \<Rightarrow>
-      (* in a leaf we just update the list of entries with the new one *)
-      let frm' = Frm_L \<lparr> lf_kvs = ins (k0,v0) (lf |> lf_kvs) \<rparr> in
-      (* and we update the store *)
-      let s1 = Store ((dest_store s0) (r0 \<mapsto> (f2p frm'))) in
-      Some (s1, Is_done)
+        (* in a leaf we just update the list of entries with the new one *)
+        let frm' = Frm_L \<lparr> lf_kvs = ins (k0,v0) (lf |> lf_kvs) \<rparr> in
+        (* and we update the store *)
+        let s1 = Store ((dest_store s0) (r0 \<mapsto> (f2p frm'))) in
+        Some (s1, Ist_done)
       | Frm_I nf \<Rightarrow>
-      (* we need to find the child containing k0 *)
-      let r' = k2r nf k0 in
-      (* we resolve the child *)
-      (case (page_ref_to_frame ctxt_p2f_r s0 r0) of
-      None => (Error |> rresult_to_option)  (* invalid page access *)
-    | Some child_frm => (
-      case (frm_to_values_number child_frm = (ctxt |> maxNumValues)) of
-       True \<Rightarrow>
-       (* the child is full: we need to split it *)
-       let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
-       (* split changed the parent frame, so we need to look for the child containing k0 again *)
-       let r'' = k2r nf' k0 in
-       Some (s1,Is_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
-       | False \<Rightarrow> Some (s0,Is_insert_nonfull(is\<lparr> ist_r := r'\<rparr>)))
+        (* we need to find the child containing k0 *)
+        let r' = k2r nf k0 in
+        (* we resolve the child *)
+        (case (page_ref_to_frame ctxt_p2f_r s0 r0) of
+        None => (Error |> rresult_to_option)  (* invalid page access *)
+        | Some child_frm => (
+          case (frm_to_values_number child_frm = (ctxt |> maxNumValues)) of
+          True \<Rightarrow>
+            (* the child is full: we need to split it *)
+            let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
+            (* split changed the parent frame, so we need to look for the child containing k0 again *)
+            let r'' = k2r nf' k0 in
+            Some (s1,Ist_insert_nonfull(is\<lparr> ist_r := r''\<rparr>))
+          | False \<Rightarrow> Some (s0,Ist_insert_nonfull(is\<lparr> ist_r := r'\<rparr>)))
        )))
-  | Is_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Is_done *)
+  | Ist_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Ist_done *)
+
+
+section "correctness of ist_step"
+
 
 end
