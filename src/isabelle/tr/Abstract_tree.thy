@@ -665,7 +665,7 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   (* the new frame contains the second half of the old frame data *)
   let s1 = Store ((dest_store s0) (z_r \<mapsto> (f2p z_frm))) in
   (* the old frame contains the first half of the old frame data *)
-  let s2 = Store ((dest_store s1) (y_r \<mapsto> (f2p y_frm'))) in
+  let s2 = Store ((dest_store s1) (y_r' \<mapsto> (f2p y_frm'))) in
   (* the parent frame got the median key and the new page_refs *)
   let s3 = Store ((dest_store s2) (x_r \<mapsto> (f2p (Frm_I x_nf')))) in
   (s3,x_nf'))"
@@ -684,8 +684,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
     Ist_root ist \<Rightarrow>
     let r0 = (ist|>ist_r) in
     let (k0,v0) = (ist|>ist_kv) in
-    (* we require a new root in order to have the data of 
-    both the tree with the new entry and the old tree without it *)
+    (* new root page_ref to duplicate tree (we want to be able to build the old tree without the new entry after the insert) *)
     let (r0',s0) = (ctxt |> free_page_ref) s0 in
     (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
     None => (Error |> rresult_to_option)  (* invalid page access *)
@@ -701,8 +700,8 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
        Some (s1,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))
        | False \<Rightarrow>
        (* we need to duplicate the root in the store *)
-       let s0' = Store ((dest_store s0) (r0' \<mapsto> (f2p frm))) in
-       Some (s0,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))))
+       let s1 = Store ((dest_store s0) (r0' \<mapsto> (f2p frm))) in
+       Some (s1,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))))
   | Ist_insert_nonfull ist \<Rightarrow>
     let r0 = (ist|>ist_r) in
     let (k0,v0) = (ist|>ist_kv) in
@@ -731,7 +730,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
             let r'' = k2r nf' k0 in
             Some (s1,root,Ist_insert_nonfull(ist\<lparr> ist_r := r''\<rparr>))
           | False \<Rightarrow>
-          (* FIXME we need to substitute r' with a new page_ref and substitute it with the  r' in the contents of r0*)
+          (** substitute r' with a new page_ref and substitute it with the  r' in the contents of r0*)
           let (r'',s0) = (ctxt |> free_page_ref) s0 in
           (* add a clone of the child (with a different page_ref) to the store *)
           let s1 = Store ((dest_store s0) (r'' \<mapsto> (f2p child_frm))) in
