@@ -589,9 +589,8 @@ record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
   free_page_ref :: "('r,'bs) store \<Rightarrow> ('r page_ref * ('r,'bs) store)" (* need to constraint this so that the returned page_ref is not in the store *)
   (* I need an interface that alters Fr_I *)
   new_nf :: "('r,'k) node_frame"
-  (*add_key_nf should also update the nf_n field of the node_frame *)
-  add_key_nf :: "'k key \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
-  add_page_ref_nf :: "'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
+  (*add_key_nf should update the nf_n field of the node_frame when key is Some *)
+  add_key_page_ref_nf :: "('k key) option \<Rightarrow> 'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
   (* [sust_page_ref_nf old new frm] substitute a given page_ref with another, if the first one is present *)
   subst_page_ref_nf :: "'r page_ref \<Rightarrow> 'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
 
@@ -626,6 +625,7 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
   (* we substitute y_r with y_r' in x_nf*)
   let x_nf = (ctxt |> subst_page_ref_nf) y_r y_r' x_nf in    
   let f2p = ((ctxt_f2p_t.truncate ctxt) |> ctxt_f2p |> dest_f2p) in
+  let add_kpr_nf = (ctxt |> add_key_page_ref_nf) in
   let ((x_r,x_nf'),(y_r',y_frm'),(z_r,z_frm)) = 
     (case y_frm of
     Frm_L y_lf \<Rightarrow>
@@ -635,30 +635,24 @@ definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
       (* first half of the entries *)
       let kvs_1 = (take ((length kvs) div 2) kvs) in
       (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
-      (* we update the parent node with z *)
-      let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we *copy* the median key (i.e. the first key of the kvs_2) of lf*)
+      (* we update the parent node with z
+      and we *copy* the median key (i.e. the first key of the kvs_2) of lf*)
       (* NB: if we are splitting nodes (in ist_step) they cannot be empty, so hd cannot be undefined *)
-      let x_nf' = (ctxt |> add_key_nf ) (fst (hd kvs_2)) x_nf' in
+      let x_nf' = add_kpr_nf (Some (fst (hd kvs_2))) z_r x_nf in
       ((x_r,x_nf'),(y_r',(Frm_L \<lparr> lf_kvs = kvs_1 \<rparr>)),(z_r,(Frm_L \<lparr> lf_kvs = kvs_2 \<rparr>)))
     | Frm_I y_nf \<Rightarrow>
       let n  = (y_nf|>nf_n)  in
       let ks = (y_nf|>nf_ks) in
       let rs = (y_nf|>nf_rs) :: (nat => 'r page_ref) in
       let median_key = ks (n div 2) in
-      (* we copy the largest keys in the new node z, the median key is excluded though (it is going in the parent )*)
-      let z_nf = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [(n div 2)+1..< n] in
-      (* we copy the page_refs in the new node z *)
-      let z_nf = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) z_nf [(n div 2 + 1)..< n + 1] in
-      (* we delete the largest keys from y (i.e. we create a new nf with the smallest keys) *)
-      let y_nf' = foldl (% a n . ((ctxt |> add_key_nf) (ks n) a) ) (ctxt |> new_nf) [0..<(n div 2)] in
-      (* we delete the page_refs in z from y *)
-      let y_nf' = foldl (% a n . ((ctxt |> add_page_ref_nf) (rs n) a) ) y_nf' [0..<(n div 2 + 1)] in
-      (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
-      (* we update the parent node with z *)
-      let x_nf' = (ctxt |> add_page_ref_nf ) z_r x_nf in
-      (* we *move* the median key (i.e. the first key of the kvs_2) of y_nf *)
-      let x_nf' = (ctxt |> add_key_nf) median_key x_nf in
+      (* we copy the largest keys and page_refs in the new node z, the median key is excluded though (it is going in the parent )*)
+      let z_nf = add_kpr_nf None (rs ((n div 2)+1)) (ctxt |> new_nf) in
+      let z_nf = foldl (% a n . (add_kpr_nf (Some (ks n)) (rs (n+1)) a) ) z_nf [(n div 2)+1..< n] in
+      (* we delete the largest keys and page_refs from y (i.e. we create a new nf with the smallest keys) *)
+      let y_nf' = add_kpr_nf (None) (rs 0) (ctxt |> new_nf) in
+      let y_nf' = foldl (% a n . (add_kpr_nf (Some (ks n)) (rs (n+1)) a) ) y_nf' [0..<(n div 2)] in
+      (* we update the parent node with z and the median_key *)
+      let x_nf' = add_kpr_nf (Some median_key) z_r x_nf in
       ((x_r,x_nf'),(y_r',(Frm_I y_nf')),(z_r,(Frm_I z_nf))))
   in
   (* we update the store *)
@@ -680,6 +674,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
   let ctxt_k2r_r = ctxt_k2r_t.truncate ctxt_f2p_r in
   let k2r = ((ctxt_k2r_r|>key_to_ref)|>dest_key_to_ref) in
   let ctxt_p2f_r = ctxt_p2f_t.truncate ctxt_k2r_r in
+  let add_kpr_nf = (ctxt |> add_key_page_ref_nf) in
   case ist0 of
     Ist_root ist \<Rightarrow>
     let r0 = (ist|>ist_r) in
@@ -694,7 +689,7 @@ definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
        (* root is full, we need to create a new root *)
        let nf_r = (ctxt |> new_nf) in
        (* the old root node is a child *)
-       let nf_r = (ctxt |> add_page_ref_nf) r0 nf_r in
+       let nf_r = add_kpr_nf None r0 nf_r in
        (* split_child updates the store with the new (page_ref, page)*)
        let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
        Some (s1,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))
