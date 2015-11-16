@@ -80,6 +80,9 @@ record ('k,'v) leaf_frame =
 
 datatype ('r,'k,'v) frame = Frm_I "('r,'k) node_frame" | Frm_L "('k,'v) leaf_frame"
 
+definition frm_to_values_number :: "('r,'k,'v) frame \<Rightarrow> nat" where
+  "frm_to_values_number frm = (case frm of Frm_I nf \<Rightarrow> (nf |> nf_n) + 1 | Frm_L lf \<Rightarrow> lf |> lf_kvs |> length)"
+
 definition key_to_v :: "('k,'v) leaf_frame => 'k key => 'v value_t option" where
   "key_to_v lf k == (lf |> lf_kvs |> map_of) k"
 
@@ -586,5 +589,176 @@ lemma fs_step_is_invariant: "
        apply(rename_tac n0')
        apply(force)
   done
+
+section "frame_to_page, ctxt_f2p"
+
+(* encoding of pages *)
+datatype ('bs,'k,'r,'v) frame_to_page = F2p "('r,'k,'v) frame \<Rightarrow> 'bs page"
+
+definition dest_f2p :: "('bs,'k,'r,'v) frame_to_page => ('r,'k,'v) frame \<Rightarrow> 'bs page" where
+  "dest_f2p x = (case x of F2p f => f)"
+
+record ('bs,'k,'r,'v) ctxt_f2p_t = "('bs,'k,'r,'v) ctxt_k2r_t" +
+  ctxt_f2p :: "('bs,'k,'r,'v) frame_to_page"
+  
+section "insert, insert_state, insert_step"
+
+type_synonym 'r root_p_ref = "'r page_ref"
+
+record ('bs,'k,'r,'v) ctxt_insert_t = "('bs,'k,'r,'v) ctxt_f2p_t" +
+  maxNumValues  :: nat
+  free_page_ref :: "('r,'bs) store \<Rightarrow> ('r page_ref * ('r,'bs) store)" (* need to constraint this so that the returned page_ref is not in the store *)
+  (* I need an interface that alters Fr_I *)
+  new_nf :: "('r,'k) node_frame"
+  (*add_key_nf should update the nf_n field of the node_frame when key is Some *)
+  add_key_page_ref_nf :: "('k key) option \<Rightarrow> 'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
+  (* [sust_page_ref_nf old new frm] substitute a given page_ref with another, if the first one is present *)
+  subst_page_ref_nf :: "'r page_ref \<Rightarrow> 'r page_ref \<Rightarrow> ('r,'k) node_frame \<Rightarrow> ('r,'k) node_frame"
+
+fun ins :: "('k * 'v) \<Rightarrow> ('k * 'v) list \<Rightarrow> ('k * 'v) list" where
+  "ins kv [] = [kv]"
+  | "ins kv (kv'#kvs) =
+    (if (fst kv) = (fst kv')
+    (* update entry *)
+    then kv#kvs
+    else kv'#(ins kv kvs))
+  "
+
+(* insert *)
+record ('k,'r,'v) insert_state_t =
+  ist_kv :: "('k key * 'v value_t)"
+  ist_r  :: "'r page_ref"
+
+datatype ('k,'r,'v) insert_state =
+    Ist_root "('k,'r,'v) insert_state_t" (* case in which root is full and we create a new root *)
+  | Ist_insert_nonfull "('k,'r,'v) insert_state_t"
+  | Ist_done
+
+definition split_child :: "('bs,'k,'r,'v) ctxt_insert_t
+  => (('r,'bs) store * ('r page_ref * ('r,'k) node_frame) * ('r page_ref * ('r,'k,'v) frame)) 
+  => (('r,'bs) store * ('r,'k) node_frame)" where
+(* NB: having a node_frame in the result allows us to spare a READ to disk (although likely that data would be in the cache) *)
+  "split_child ctxt c0 = (
+  let (s0, (x_r,x_nf),(y_r,y_frm)) = c0 in
+  (* we need to allocate 2 new nodes *)
+  let (z_r,s0) = (ctxt |> free_page_ref) s0 in
+  let (y_r',s0) = (ctxt |> free_page_ref) s0 in
+  (* we substitute y_r with y_r' in x_nf*)
+  let x_nf = (ctxt |> subst_page_ref_nf) y_r y_r' x_nf in    
+  let f2p = ((ctxt_f2p_t.truncate ctxt) |> ctxt_f2p |> dest_f2p) in
+  let add_kpr_nf = (ctxt |> add_key_page_ref_nf) in
+  let ((x_r,x_nf'),(y_r',y_frm'),(z_r,z_frm)) = 
+    (case y_frm of
+    Frm_L y_lf \<Rightarrow>
+      let kvs = y_lf |> lf_kvs in
+      (* second half of the entries *)
+      let kvs_2 = (drop ((length kvs) div 2) kvs) in
+      (* first half of the entries *)
+      let kvs_1 = (take ((length kvs) div 2) kvs) in
+      (* FIXME likely I need to insert key and page_ref together in a frame to permit the right positioning of them *)  
+      (* we update the parent node with z
+      and we *copy* the median key (i.e. the first key of the kvs_2) of lf*)
+      (* NB: if we are splitting nodes (in ist_step) they cannot be empty, so hd cannot be undefined *)
+      let x_nf' = add_kpr_nf (Some (fst (hd kvs_2))) z_r x_nf in
+      ((x_r,x_nf'),(y_r',(Frm_L \<lparr> lf_kvs = kvs_1 \<rparr>)),(z_r,(Frm_L \<lparr> lf_kvs = kvs_2 \<rparr>)))
+    | Frm_I y_nf \<Rightarrow>
+      let n  = (y_nf|>nf_n)  in
+      let ks = (y_nf|>nf_ks) in
+      let rs = (y_nf|>nf_rs) :: (nat => 'r page_ref) in
+      let median_key = ks (n div 2) in
+      (* we copy the largest keys and page_refs in the new node z, the median key is excluded though (it is going in the parent )*)
+      let z_nf = add_kpr_nf None (rs ((n div 2)+1)) (ctxt |> new_nf) in
+      let z_nf = foldl (% a n . (add_kpr_nf (Some (ks n)) (rs (n+1)) a) ) z_nf [(n div 2)+1..< n] in
+      (* we delete the largest keys and page_refs from y (i.e. we create a new nf with the smallest keys) *)
+      let y_nf' = add_kpr_nf (None) (rs 0) (ctxt |> new_nf) in
+      let y_nf' = foldl (% a n . (add_kpr_nf (Some (ks n)) (rs (n+1)) a) ) y_nf' [0..<(n div 2)] in
+      (* we update the parent node with z and the median_key *)
+      let x_nf' = add_kpr_nf (Some median_key) z_r x_nf in
+      ((x_r,x_nf'),(y_r',(Frm_I y_nf')),(z_r,(Frm_I z_nf))))
+  in
+  (* we update the store *)
+  (* the new frame contains the second half of the old frame data *)
+  let s1 = Store ((dest_store s0) (z_r \<mapsto> (f2p z_frm))) in
+  (* the old frame contains the first half of the old frame data *)
+  let s2 = Store ((dest_store s1) (y_r' \<mapsto> (f2p y_frm'))) in
+  (* the parent frame got the median key and the new page_refs *)
+  let s3 = Store ((dest_store s2) (x_r \<mapsto> (f2p (Frm_I x_nf')))) in
+  (s3,x_nf'))"
+
+definition ist_step :: "('bs,'k,'r,'v) ctxt_insert_t
+  => (('r,'bs) store * 'r root_p_ref * ('k,'r,'v) insert_state) 
+  => (('r,'bs) store * 'r root_p_ref * ('k,'r,'v) insert_state) option" where
+  "ist_step ctxt s0ist0 = (
+  let (s0,root,ist0) = s0ist0 in
+  let ctxt_f2p_r = (ctxt_f2p_t.truncate ctxt) in
+  let f2p = (ctxt_f2p_r |> ctxt_f2p |> dest_f2p) in
+  let ctxt_k2r_r = ctxt_k2r_t.truncate ctxt_f2p_r in
+  let k2r = ((ctxt_k2r_r|>key_to_ref)|>dest_key_to_ref) in
+  let ctxt_p2f_r = ctxt_p2f_t.truncate ctxt_k2r_r in
+  let add_kpr_nf = (ctxt |> add_key_page_ref_nf) in
+  case ist0 of
+    Ist_root ist \<Rightarrow>
+    let r0 = (ist|>ist_r) in
+    let (k0,v0) = (ist|>ist_kv) in
+    (* new root page_ref to duplicate tree (we want to be able to build the old tree without the new entry after the insert) *)
+    let (r0',s0) = (ctxt |> free_page_ref) s0 in
+    (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
+    None => (Error |> rresult_to_option)  (* invalid page access *)
+    | Some frm => (
+      case (frm_to_values_number frm = (ctxt |> maxNumValues)) of
+       True \<Rightarrow>
+       (* root is full, we need to create a new root *)
+       let nf_r = (ctxt |> new_nf) in
+       (* the old root node is a child *)
+       let nf_r = add_kpr_nf None r0 nf_r in
+       (* split_child updates the store with the new (page_ref, page)*)
+       let (s1,_) = split_child ctxt (s0,(r0',nf_r),(r0,frm)) in
+       Some (s1,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))
+       | False \<Rightarrow>
+       (* we need to duplicate the root in the store *)
+       let s1 = Store ((dest_store s0) (r0' \<mapsto> (f2p frm))) in
+       Some (s1,r0',Ist_insert_nonfull(ist\<lparr> ist_r := r0'\<rparr>))))
+  | Ist_insert_nonfull ist \<Rightarrow>
+    let r0 = (ist|>ist_r) in
+    let (k0,v0) = (ist|>ist_kv) in
+    (case (page_ref_to_frame ctxt_p2f_r s0 r0) of 
+    None => (Error |> rresult_to_option)  (* invalid page access *)
+    | Some frm => ( 
+      case frm of
+      Frm_L lf \<Rightarrow>
+        (* in a leaf we just update the list of entries with the new one *)
+        let frm' = Frm_L \<lparr> lf_kvs = ins (k0,v0) (lf |> lf_kvs) \<rparr> in
+        (* and we update the store *)
+        let s1 = Store ((dest_store s0) (r0 \<mapsto> (f2p frm'))) in
+        Some (s1,root,Ist_done)
+      | Frm_I nf \<Rightarrow>
+        (* we need to find the child containing k0 *)
+        let r' = k2r nf k0 in
+        (* we resolve the child *)
+        (case (page_ref_to_frame ctxt_p2f_r s0 r0) of
+        None => (Error |> rresult_to_option)  (* invalid page access *)
+        | Some child_frm => (
+          case (frm_to_values_number child_frm = (ctxt |> maxNumValues)) of
+          True \<Rightarrow>
+            (* the child is full: we need to split it *)
+            let (s1,nf') = split_child ctxt (s0,(r0,nf),(r',child_frm)) in
+            (* split changed the parent frame, so we need to look for the child containing k0 again *)
+            let r'' = k2r nf' k0 in
+            Some (s1,root,Ist_insert_nonfull(ist\<lparr> ist_r := r''\<rparr>))
+          | False \<Rightarrow>
+          (** substitute r' with a new page_ref and substitute it with the  r' in the contents of r0*)
+          let (r'',s0) = (ctxt |> free_page_ref) s0 in
+          (* add a clone of the child (with a different page_ref) to the store *)
+          let s1 = Store ((dest_store s0) (r'' \<mapsto> (f2p child_frm))) in
+          (* update r0 contents with r'' instead of r' *)
+          let frm' = (Frm_I ((ctxt |> subst_page_ref_nf) r' r'' nf)) in
+          let s2 = Store ((dest_store s1) (r0 \<mapsto> (f2p frm'))) in
+          Some (s2,root,Ist_insert_nonfull(ist\<lparr> ist_r := r''\<rparr>)))
+       )))
+  | Ist_done \<Rightarrow> (Error |> rresult_to_option))"  (* attempt to step Ist_done *)
+
+
+section "correctness of ist_step"
+
 
 end
