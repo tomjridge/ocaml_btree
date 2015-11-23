@@ -6,6 +6,11 @@ section types
 
 datatype ('r) stk = Stk "('r page_ref * nat) list"
 
+definition stk_cons :: "'r stk => ('r page_ref * nat) => 'r stk" where
+  "stk_cons stk rn == (case stk of 
+    Stk xs => Stk(rn # xs))"
+
+
 section "parameters"
 
 section "insert,  ins_state, ins_step"
@@ -53,11 +58,17 @@ case s0 of
       | Some frm0 => (
         case frm0 of
         Frm_I nf => (  
-          let k2r = ((ctxt1|>key_to_ref)|>dest_key_to_ref) in
-          let r' = k2r nf k0 in (* we need the index *)
-          
+          let k2r = ((ctxt1|>key_to_ref2)|>dest_key_to_ref) in
+          let k0 = (isd|>isd_k) in
+          let i = k2r nf k0 in (* we need the index *)
+          let r' = (nf|>nf_rs) i in
+          let stk = (isd|>isd_stk) in
+          let stk' = stk_cons stk (r',i) in
+          Some(Down(isd \<lparr> isd_r:= r', isd_stk:=stk'  \<rparr>))
         )
-        | Frm_L lf => None
+        | Frm_L lf => (
+          None
+        )
       )
     )
     | _ => arb
