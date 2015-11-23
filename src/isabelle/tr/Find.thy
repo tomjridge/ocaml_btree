@@ -5,34 +5,6 @@ imports
 begin
 
 
-section "(given node_frame) key_to_ref, ctxt_k2r_t"
-
-
-
-
-(* NB we need some properties of these functions for correctness 
-
-This abstracts from the particular find implementation. Essentially, at a non-leaf node, we need to map
-a key to a page ref, from which we can continue the find. The property this function should have is
-that, given a key, if there is a value corresponding to the key (which is unique), then the 
-returned page ref identifies the relevant subtree.
-
-*)
-datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
-(* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
-
-definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
-  "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
-
-(*
-definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v value_t option" where
-  "dest_key_to_v k2v == (case k2v of Key_to_v f => f)"
-*)
-
-(**********)
-record  ('bs,'k,'r,'v) ctxt_k2r_t =  "('bs,'k,'r,'v) ctxt_p2f_t" +
-  key_to_ref :: "('bs,'k,'r,'v) key_to_ref"
-(*  key_to_v :: "('bs,'k,'r,'v) key_to_v" *)
 
 
 section "find, find_state, fs_step"
@@ -69,8 +41,7 @@ definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
     | Some frm => (
       case frm of 
       Frm_I nf => (
-        let k2r = ((ctxt1|>key_to_ref)|>dest_key_to_ref) in
-        let r' = k2r nf k0 in
+        let r' = apply_key_to_ref (ctxt1|>key_to_ref2) nf k0 in
         Some(Fs_l (fsl (| fsl_r := r' |))))
       | Frm_L lf => (
         let k2v = key_to_v in
@@ -110,7 +81,7 @@ definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
 (* and the map exists at r0 *)
 & (page_ref_to_map ctxt s0 r0 n0 = Some m1)
 (* and we descend to r' *)
-& (dest_key_to_ref (key_to_ref ctxt1) nf k0 = r')
+& (apply_key_to_ref (ctxt1|>key_to_ref2) nf k0 = r')
 (* and the map exists at r' *)
 & (page_ref_to_map ctxt s0 r' (n0 - Suc 0) = Some m1')
 (* then the maps agree, at least for the key *)
@@ -135,7 +106,7 @@ definition wf_store_page_ref_to_map :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) st
 (page_ref_to_map c0 s0 r0 n0 = Some m1)
 & (page_ref_to_frame c0 s0 r0 = Some (Frm_I nf))
 (* and we follow the key to r' *)
-& (dest_key_to_ref (c1|>key_to_ref) nf k0 = r')
+& (apply_key_to_ref (c1|>key_to_ref2) nf k0 = r')
 (* then we still have a map *)
 & (page_ref_to_map c0 s0 r' (n0 - Suc 0) = None)
 ) --> False
@@ -230,11 +201,11 @@ lemma fs_step_is_invariant: "
      apply(thin_tac "fs0 = ?x")
      apply(thin_tac "frm' = ?x")
      apply(thin_tac "x=?x")
-     apply(subgoal_tac "? fsl'. (fsl\<lparr>fsl_r := (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0\<rparr>) = fsl'")
+     apply(subgoal_tac "? fsl'. (fsl\<lparr>fsl_r := (ctxt1 |> key_to_ref2 |> dest_key_to_ref) nf k0\<rparr>) = fsl'")
       prefer 2 apply(force)
      apply(erule exE)
      apply(simp)
-     apply(subgoal_tac "? r'. (ctxt1 |> key_to_ref |> dest_key_to_ref) nf k0 = r'")
+     apply(subgoal_tac "? r'. (ctxt1 |> key_to_ref2 |> dest_key_to_ref) nf k0 = r'")
       prefer 2 apply(force)
      apply(erule exE)
      (* note how this goal is concise and readable *)
@@ -274,7 +245,7 @@ lemma fs_step_is_invariant: "
        apply(simp add: wf_store_def wf_store_page_ref_to_map_def Let_def)
        apply(elim conjE)
        apply(erule exE)
-       apply(simp add: page_ref_to_map_def page_ref_to_kvs_def rev_apply_def find_state_to_page_ref_def)
+       apply(simp add: page_ref_to_map_def page_ref_to_kvs_def rev_apply_def find_state_to_page_ref_def apply_key_to_ref_def)
        apply(elim exE conjE)
        apply(simp)
        apply (metis option.distinct(1))  
@@ -284,7 +255,7 @@ lemma fs_step_is_invariant: "
        apply(simp)
        apply(thin_tac "m0'=?x")
        (* m1 k0 = v0 --> m1' k0 = v0 ; this holds by wellformedness of key_to_ref, and page_ref_to_map Suc *)
-       apply(simp add: wf_ctxt1_def)
+       apply(simp add: wf_ctxt1_def apply_key_to_ref_def rev_apply_def)
        apply(force)
 
 

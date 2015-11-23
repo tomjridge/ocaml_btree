@@ -172,5 +172,39 @@ definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store => 
     Option.bind m0 (% m. m k0))"
 
 
+section "(given node_frame) key_to_ref, ctxt_k2r_t"
+
+
+
+
+(* NB we need some properties of these functions for correctness 
+
+This abstracts from the particular find implementation. Essentially, at a non-leaf node, we need to map
+a key to a page ref, from which we can continue the find. The property this function should have is
+that, given a key, if there is a value corresponding to the key (which is unique), then the 
+returned page ref identifies the relevant subtree.
+
+*)
+datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => 'r page_ref" 
+(* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
+
+definition dest_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame => 'k key => 'r page_ref" where
+  "dest_key_to_ref k2r == (case k2r of Key_to_ref f => f)"
+
+(*
+definition dest_key_to_v :: "('bs,'k,'r,'v) key_to_v => ('k,'v) leaf_frame => 'k key => 'v value_t option" where
+  "dest_key_to_v k2v == (case k2v of Key_to_v f => f)"
+*)
+
+(**********)
+record  ('bs,'k,'r,'v) ctxt_k2r_t =  "('bs,'k,'r,'v) ctxt_p2f_t" +
+  key_to_ref2 :: "('bs,'k,'r,'v) key_to_ref"
+(*  key_to_v :: "('bs,'k,'r,'v) key_to_v" *)
+
+definition apply_key_to_ref :: "('bs,'k,'r,'v) key_to_ref => ('r,'k) node_frame  => 'k key => 'r page_ref" where
+  "apply_key_to_ref k2r nf k0 == (
+    let r' = (dest_key_to_ref k2r) nf k0 in
+    r')"
+
 end
 
