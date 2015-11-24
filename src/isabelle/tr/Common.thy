@@ -46,12 +46,12 @@ datatype 'r page_ref = Page_ref 'r
 definition dest_page_ref :: "'r page_ref => 'r" where
   "dest_page_ref r0 == (case r0 of Page_ref r => r)"
 
-datatype ('r,'bs) store = Store "('r page_ref ~=> 'bs page)"  (* different to paper: we store actual bytes *)
+datatype ('bs,'r) store = Store "('r page_ref ~=> 'bs page)"  (* different to paper: we store actual bytes *)
 
-definition dest_store :: "('r,'bs) store => ('r page_ref ~=> 'bs page)" where
+definition dest_store :: "('bs,'r) store => ('r page_ref ~=> 'bs page)" where
   "dest_store s0 == (case s0 of Store f => f)"
 
-definition ref_to_page :: "('r,'bs) store => 'r page_ref => 'bs page option" where
+definition ref_to_page :: "('bs,'r) store => 'r page_ref => 'bs page option" where
   "ref_to_page s0 r0 == (s0|>dest_store) r0"
 
 
@@ -99,7 +99,7 @@ record  ('bs,'k,'r,'v) ctxt_p2f_t =
   ctxt_p2f :: "('bs,'k,'r,'v) page_to_frame"
 
 (* from this point, we don't duplicate 0/Suc defns, to minimize # of defns *)
-definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store =>  'r page_ref => ('r,'k,'v) frame option" where
+definition page_ref_to_frame :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store =>  'r page_ref => ('r,'k,'v) frame option" where
   "page_ref_to_frame c0 s0 r0 == (
     case ref_to_page s0 r0 of
     None => (Error |> rresult_to_option)  (* invalid page access *)
@@ -128,7 +128,7 @@ termination  (* tree_to_kvs_dom is not right here - the function package seems c
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
-fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k,'v) tree option" where
+fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page_ref => tree_height => ('k,'v) tree option" where
   "page_ref_to_tree c0 s0 r0 0 = (
       case page_ref_to_frame c0 s0 r0 of 
       None => (Error |> rresult_to_option) 
@@ -153,7 +153,7 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page
         | Frm_L(_) => (Error |> rresult_to_option)))"  (* found Frm_L but tree_height was not 0 *)
 
 (* notice that this ideally belongs in section "page and frame" *)
-definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key*'v value_t) list option" where
+definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page_ref => tree_height => ('k key*'v value_t) list option" where
   "page_ref_to_kvs c0 s0 r0 n0 == (
   (page_ref_to_tree c0 s0 r0 n0)
   |> (% x. case x of
@@ -163,10 +163,10 @@ definition page_ref_to_kvs ::  "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 
 definition kvs_to_map :: "('k key*'v value_t) list => ('k key ~=> 'v value_t)" where
   "kvs_to_map kvs == (map_of kvs)"
 
-definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('r,'bs) store => 'r page_ref => tree_height => ('k key ~=> 'v value_t) option" where
+definition page_ref_to_map :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page_ref => tree_height => ('k key ~=> 'v value_t) option" where
   "page_ref_to_map c0 s0 r0 n0 == (page_ref_to_kvs c0 s0 r0 n0) |> (map_option kvs_to_map)"
 
-definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt_p2f_t => ('r,'bs) store => 'r page_ref => tree_height =>'k key => 'v value_t option" where
+definition page_ref_key_to_v :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store => 'r page_ref => tree_height =>'k key => 'v value_t option" where
   "page_ref_key_to_v ctxt s0 r0 n0 k0 == (
     let m0 = page_ref_to_map ctxt s0 r0 n0 in
     Option.bind m0 (% m. m k0))"

@@ -13,12 +13,12 @@ section "find, find_state, fs_step"
 record ('bs,'k,'r,'v) find_state_l =
   fsl_k :: "'k key"
   fsl_r :: "'r page_ref"
-(*   fnd0_s :: "('r,'bs) store" *)
+(*   fnd0_s :: "('bs,'r) store" *)
 
 record ('bs,'k,'r,'v) find_state_r =
   fsr_r :: "'r page_ref"
   fsr_v :: "'v value_t option"
-(*  fnd1_s :: "('r,'bs) store" *)
+(*  fnd1_s :: "('bs,'r) store" *)
 
 datatype ('bs,'k,'r,'v) find_state = Fs_l "('bs,'k,'r,'v) find_state_l" | Fs_r "('bs,'k,'r,'v) find_state_r"
 
@@ -28,7 +28,7 @@ definition find_state_to_page_ref :: "('bs,'k,'r,'v) find_state => 'r page_ref" 
     | Fs_r fsr => (fsr |> fsr_r))"
 
 definition fs_step :: "('bs,'k,'r,'v) ctxt_k2r_t
-  => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
+  => (('bs,'r) store * ('bs,'k,'r,'v) find_state) 
   => (('bs,'k,'r,'v) find_state) option" where
   "fs_step ctxt1 s0fs0 == (
   let (s0,fs0) = s0fs0 in
@@ -57,7 +57,7 @@ text "iterate the fs_step function n times"
 (* FIXME in the following we may want to use a standard isabelle while construction *)
 definition fs_step_as_fun :: "('bs,'k,'r,'v) ctxt_k2r_t 
   => tree_height
-  => (('r,'bs) store * ('bs,'k,'r,'v) find_state) 
+  => (('bs,'r) store * ('bs,'k,'r,'v) find_state) 
   => (('bs,'k,'r,'v) find_state)" where
   "fs_step_as_fun ctxt1 n0 s0fs0 == (
   let (s0,fs0) = s0fs0 in
@@ -91,14 +91,14 @@ definition wf_ctxt1:: "('bs,'k,'r,'v) ctxt_k2r_t => bool" where
 
 
 (*
-definition wf_store_page_ref_to_map_none :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+definition wf_store_page_ref_to_map_none :: "('bs,'k,'r,'v) ctxt_k2r_t => ('bs,'r) store => tree_height => 'r page_ref => bool" where
   "wf_store_page_ref_to_map_none  c1 s0 n0 r0 == (
     let c0 = ctxt_p2f_t.truncate c1 in
     ((page_ref_to_map c0 s0 r0 n0 = None) --> False)
   )"
 *)
 
-definition wf_store_page_ref_to_map :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+definition wf_store_page_ref_to_map :: "('bs,'k,'r,'v) ctxt_k2r_t => ('bs,'r) store => tree_height => 'r page_ref => bool" where
   "wf_store_page_ref_to_map  c1 s0 n0 r0 == (
     let c0 = ctxt_p2f_t.truncate c1 in
 (! m1 r' nf k0 . ((
@@ -115,7 +115,7 @@ definition wf_store_page_ref_to_map :: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) st
   )"
 
 
-definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_height => 'r page_ref => bool" where
+definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('bs,'r) store => tree_height => 'r page_ref => bool" where
   "wf_store c1 s0 n0 r0 == (
 (*    wf_store_page_ref_to_map_none c1 s0 n0 r0 *)
     wf_store_page_ref_to_map c1 s0 n0 r0
@@ -131,7 +131,7 @@ definition wf_store:: "('bs,'k,'r,'v) ctxt_k2r_t => ('r,'bs) store => tree_heigh
 section "correctness of fs_step"
 
 definition fs_step_invariant :: "('bs,'k,'r,'v) ctxt_p2f_t
-  => (('r,'bs) store * ('bs,'k,'r,'v) find_state)
+  => (('bs,'r) store * ('bs,'k,'r,'v) find_state)
   => tree_height
   => 'v value_t option
   => bool" where

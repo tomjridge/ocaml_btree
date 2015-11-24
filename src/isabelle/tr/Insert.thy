@@ -4,6 +4,9 @@ begin
 
 section types
 
+(* the stack records a list of pages, and the index within the page that was followed;
+the page is always a nf
+ *)
 datatype ('r) stk = Stk "('r page_ref * nat) list"
 
 definition stk_cons :: "'r stk => ('r page_ref * nat) => 'r stk" where
@@ -20,9 +23,10 @@ record ('bs,'k,'r,'v) ins_state_down =
   isd_v :: "'v value_t"
   isd_r :: "'r page_ref"
   isd_stk :: "'r stk"
-  isd_str :: "('r,'bs) store"
+  isd_str :: "('bs,'r) store"
 
 record ('r) ins_state_up_1 = 
+  (* r is the node we have just come from ie the node we just modified *)
   isu1_r :: "'r page_ref"
   
 (* r1 <= k < r2 *)
@@ -43,13 +47,14 @@ record ('bs,'k,'r,'v) ins_state_up =
 datatype ('bs,'k,'r,'v) ins_state = 
   Down "('bs,'k,'r,'v) ins_state_down"
   | Up "('bs,'k,'r,'v) ins_state_up"
+  | Ret "('r page_ref * ('bs,'r) store)"
 
 
 definition ins_step :: "('bs,'k,'r,'v) ctxt_k2r_t
   => ('bs,'k,'r,'v) ins_state 
   =>  ('bs,'k,'r,'v) ins_state option" where
-  "ins_step ctxt1 s0 == (
-case s0 of
+  "ins_step ctxt1 is0 == (
+case is0 of
     Down isd => (
       let r0 = isd|>isd_r in
       let frm = (page_ref_to_frame (ctxt_p2f_t.truncate ctxt1) (isd|>isd_str) r0) in
@@ -63,15 +68,46 @@ case s0 of
           let i = k2r nf k0 in (* we need the index *)
           let r' = (nf|>nf_rs) i in
           let stk = (isd|>isd_stk) in
-          let stk' = stk_cons stk (r',i) in
+          let stk' = stk_cons stk (r0,i) in
           Some(Down(isd \<lparr> isd_r:= r', isd_stk:=stk'  \<rparr>))
         )
         | Frm_L lf => (
-          None
+          (* we do the insert, no split case *)
+          let kvs = (lf |> lf_kvs) in
+          let (k,v) = (isd |> isd_k, isd |> isd_v) in
+          let kvs' = (k,v)#kvs in
+          let (s0::('bs,'r)store,r') = arb (* new_ref (s0|>isd_str) *) in
+          let s0 = arb (* write_frame s0 r (Frm_L \<lparr> lf_kvs:=kvs' \<rparr>) *) in
+          let isu1 = \<lparr> isu1_r=r' \<rparr> in
+          let isu' = S(isu1) in
+          let isu = \<lparr> isu_s = isu', isu_stk = (isd |> isd_stk), isu_str = s0 \<rparr> in
+          Some(Up isu)
         )
       )
     )
-    | _ => arb
+    | Up isu => (
+      let (isu',stk,s0) = (isu|>isu_s,isu|>isu_stk,isu|>isu_str) in
+      case isu' of
+      S isu1 => (
+        let r = isu1|>isu1_r in
+        case stk of Stk([]) => Some(Ret(r,s0)) 
+        | Stk((r2,n2)#rns) => (
+          (* we need to insert r in the place recorded in the stack *)
+          let frm = (page_ref_to_frame (ctxt_p2f_t.truncate ctxt1) s0 r2) in
+          case frm of None => (Error |> rresult_to_option) | Some x => (case x of
+          Frm_I nf => (
+            let (s0::('bs,'r)store,r'::'r page_ref) = arb (* new ref *) in
+            let nf'::('r,'k) node_frame = arb nf r n2 in (* substitute *)
+            let s0::('bs,'r)store = arb s0 r' nf' in (* write new page *) 
+            let isu1 = \<lparr> isu1_r=r' \<rparr> in
+            let isu' = S(isu1) in
+            let isu = \<lparr> isu_s = isu', isu_stk = (Stk(rns)), isu_str = s0 \<rparr> in
+            Some(Up isu) )
+          | _ => impossible (* ins_step: impossible *)
+          )))
+      | D isu2 => arb
+      
+    )
     
   )"
 
