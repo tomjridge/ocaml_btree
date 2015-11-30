@@ -2,6 +2,7 @@ theory Common
 imports Main
 begin
 
+(* FIXME when to use options and when to use rresult *)
 
 section "preliminaries"
 
@@ -127,8 +128,29 @@ termination  (* tree_to_kvs_dom is not right here - the function package seems c
 
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
 
+
+type_synonym ('k,'r,'v) pr2f_t = " ('r page_ref => ('k,'v) tree option)"
+
+definition nf_to_subtrees' :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 
+  ('r,'k) node_frame => (* given a node frame *)
+  ('k,'r,'v) pr2f_t => (* and a function taking page_refs and giving subtrees (the recursive call) *)
+  (nat => ('k,'v) tree) rresult" (* produce the equivalent of the nf, but with trees not refs *)
+where
+  "nf_to_subtrees' c0 s0 nf pr2t == (
+          let n = (nf|>nf_n) in
+          let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
+          let f0 = pr2t :: ('r page_ref => ('k,'v) tree option) in
+          let prop = (! (m::nat). m <= n --> m |> rs |> f0 |> is_Some) in (* we use \<le> because the number of subtrees to create is n (number of keys) + 1 --since we start from index 0, it is just n*)
+          case prop of
+          True => (Ok(% (m::nat). m |> rs |> f0 |> dest_Some))
+          | False => (Error)  (* Frm_I was not wellformed - prop was false *)
+  )"
+
 (* NB this has an explicit n argument, whereas wfness gives us that we can just use page_ref_to_frame *)
-fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page_ref => tree_height => ('k,'v) tree option" where
+fun page_ref_to_tree :: "
+  ('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page_ref => tree_height => 
+  ('k,'v) tree option" 
+where
   "page_ref_to_tree c0 s0 r0 0 = (
       case page_ref_to_frame c0 s0 r0 of 
       None => (Error |> rresult_to_option) 
@@ -142,14 +164,13 @@ fun page_ref_to_tree :: "('bs,'k,'r,'v) ctxt_p2f_t =>  ('bs,'r) store => 'r page
       | Some frm => (
         case frm of 
         Frm_I(nf) => (
-          let n = (nf|>nf_n) in
           let ks = (nf|>nf_ks) in
-          let rs = (nf|>nf_rs) :: (nat => 'r page_ref) in
-          let f0 = (% r. page_ref_to_tree c0 s0 r n') :: ('r page_ref => ('k,'v) tree option) in
-          let prop = (! (m::nat). m <= n --> m |> rs |> f0 |> is_Some) in (* we use \<le> because the number of subtrees to create is n (number of keys) + 1 --since we start from index 0, it is just n*)
-          case prop of
-          True => (Some(Tr_nd(n,ks,(% (m::nat). m |> rs |> f0 |> dest_Some))))
-          | False => (Error |> rresult_to_option))  (* Frm_I was not wellformed - prop was false *)
+          let rs :: (nat => 'r page_ref) = nf|>nf_rs in
+          let pr2t ::  ('k,'r,'v) pr2f_t = (% r. page_ref_to_tree c0 s0 r n') in
+          let subtrees :: (nat => ('k,'v) tree) rresult = nf_to_subtrees' c0 s0 nf pr2t in
+          case subtrees of
+          Error => (Error |> rresult_to_option) 
+          | Ok subtrees => (arb))
         | Frm_L(_) => (Error |> rresult_to_option)))"  (* found Frm_L but tree_height was not 0 *)
 
 (* notice that this ideally belongs in section "page and frame" *)

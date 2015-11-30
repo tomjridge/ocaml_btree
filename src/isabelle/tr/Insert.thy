@@ -9,9 +9,40 @@ the page is always a nf
  *)
 datatype ('r) stk = Stk "('r page_ref * nat) list"
 
+definition dest_stk :: "'r stk => ('r page_ref * nat) list" where
+  "dest_stk stk == (case stk of Stk xs => xs)"
+
 definition stk_cons :: "'r stk => ('r page_ref * nat) => 'r stk" where
   "stk_cons stk rn == (case stk of 
     Stk xs => Stk(rn # xs))"
+
+
+section "tree substitution"
+
+(* we need to construct the tree, given a stack and a subtree (or two subtrees) *)
+
+definition tree_subst :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store => 
+  ('k,'v) tree => (* given a subtree *)
+  'r stk => (* and a stack identifying the subtree *)
+  ('k,'v) tree option" (* return the new tree resulting from substituting the given subtree *)
+where
+  "tree_subst c0 s0 t0 stk0 == (
+    case stk0 of 
+    Stk [] => (Some t0)
+    | Stk ((r0,n0)#xs) => (
+      let h0 = arb in (* FIXME what to do about height?! *)
+      let t1 = page_ref_to_tree c0 s0 r0 h0 in
+      let t2 = (
+        case t1 of
+        None => Error
+        | Some x =>(
+          case x of
+          Tr_lf _ => Error (* impossible if stk wf *)
+          | Tr_nd(n,ks,ts) => Ok(Tr_nd(n,ks,ts(n0 := t0))))
+        )         
+      in
+      t2 |> rresult_to_option)
+)"
 
 
 section "parameters"
