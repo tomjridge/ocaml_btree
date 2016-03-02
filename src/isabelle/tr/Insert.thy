@@ -16,34 +16,140 @@ definition stk_cons :: "'r stk => ('r page_ref * nat) => 'r stk" where
   "stk_cons stk rn == (case stk of 
     Stk xs => Stk(rn # xs))"
 
+definition stk_size :: "'r stk => nat" where
+  "stk_size stk == (case stk of (Stk xs) => size(xs))"
+
 
 section "tree substitution"
 
 (* we need to construct the tree, given a stack and a subtree (or two subtrees) *)
 
-definition tree_subst :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store => 
+function tree_subst :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store => 
   ('k,'v) tree => (* given a subtree *)
   'r stk => (* and a stack identifying the subtree *)
   ('k,'v) tree option" (* return the new tree resulting from substituting the given subtree *)
 where
-  "tree_subst c0 s0 t0 stk0 == (
+  "tree_subst c0 s0 t0 stk0 = (
     case stk0 of 
     Stk [] => (Some t0)
-    | Stk ((r0,n0)#xs) => (
+    | Stk ((r0,n0)#stk1) => (
       let h0 = arb in (* FIXME what to do about height?! *)
       let t1 = page_ref_to_tree c0 s0 r0 h0 in
       let t2 = (
         case t1 of
-        None => Error
+        None => (Error |> rresult_to_option)
         | Some x =>(
           case x of
-          Tr_lf _ => Error (* impossible if stk wf *)
-          | Tr_nd(n,ks,ts) => Ok(Tr_nd(n,ks,ts(n0 := t0))))
-        )         
+          Tr_lf _ => (Error |> rresult_to_option) (* impossible if stk wf *)
+          | Tr_nd(n,ks,ts) => (
+            let t0' = Tr_nd(n,ks,ts(n0 := t0)) in
+            tree_subst c0 s0 t0' (Stk(stk1))
+          ))
+        )
       in
-      t2 |> rresult_to_option)
+      t2)
 )"
+by pat_completeness auto
+termination
+  apply(force intro:FIXME)
+  done
 
+(* in one step, the effect of substitution at position n is... *)
+
+definition tree_subst_1 :: "('bs,'k,'r,'v) ctxt_p2f_t => ('bs,'r) store => 
+  ('k,'v) tree => (* given a subtree *)
+  ('r page_ref * nat) => (* and a stack frame identifying the subtree *)
+  ('k,'v) tree option" (* return the new tree resulting from substituting the given subtree *)
+where
+  "tree_subst_1 c0 s0 t0 r0n0 == (
+      let (r0,n0) = r0n0 in
+      let h0 = arb in (* FIXME what to do about height?! *)
+      let t1 = page_ref_to_tree c0 s0 r0 h0 in
+      let t2 = (
+        case t1 of
+        None => (Error |> rresult_to_option)
+        | Some x =>(
+          case x of
+          Tr_lf _ => (Error |> rresult_to_option) (* impossible if stk wf *)
+          | Tr_nd(n,ks,ts) => (
+            let t0' = Tr_nd(n,ks,ts(n0 := t0)) in
+            Some(t0')
+          ))
+        )
+      in
+      t2)
+"
+
+(* for tree contexts, it is convenient to work with partial trees, where a node may map to none;
+instead, we use the degenerate node Tr_nd[]
+ *)
+
+
+(* tree_subst_1 has the following property; 
+FIXME need to distinguish the types of failure and success; roughly there is a failure
+"at this level", and a failure at a lower level (which we don't care too much about the nature of)
+
+we really need to move to a formalization with a "hole"; does thiemann et al have a notion of 
+leaves and the effect of hole substitution?
+
+need to get some version of his stuff
+
+
+*)
+lemma exists_kvs_l_kvs_r: "? kvs_l kvs_r.
+(((tree_subst_1 c0 s0 (Tr_nd(0,ks,ts)) (r0,n0)) |> (Option.map_option tree_to_leaves)) 
+  = Some(kvs_l@[]@kvs_r))
+& (length kvs_l = n0)
+"
+  sorry
+
+lemma "
+(((tree_subst_1 c0 s0 (Tr_nd(0,ks,ts)) (r0,n0)) |> tree_to_leaves) = kvs_l@[]@kvs_r)
+& (length kvs_l = n0)
+"
+oops
+
+
+
+
+(* want to know what the effect of substituting a tree is, in terms of the leaves; we need to know
+the following holds for our defn of tree subst; the problem is how to get kvs_l and kvs_r *)
+
+lemma "
+! stk0. (stk_size(stk0) = n0)
+--> (? kvs_l kvs_r. ! t0 kvs_c. 
+  ((t0 |> tree_to_leaves) = ((kvs_c)))
+  --> ((tree_subst c0 s0 t0 stk0) |> (map_option tree_to_leaves) = Some(kvs_l@kvs_c@kvs_r)))
+"
+apply(induct_tac n0)
+ apply(intro allI impI)
+ apply(rule_tac x="[]" in exI)
+ apply(rule_tac x="[]" in exI)
+ apply(intro allI impI)
+ apply(subgoal_tac "stk0 = Stk[]") prefer 2 apply (metis case_stk_def length_0_conv stk.exhaust stk.rec stk_size_def)
+ apply(simp)
+ apply (metis option.simps(9) rev_apply_def)
+
+ (* size stk0 = Suc n *)
+ apply(intro allI impI)
+ apply(case_tac stk0)
+ apply(case_tac list) apply (metis list.size(3) old.nat.distinct(2) stk.case stk_size_def)
+ apply(rename_tac rn stk1)
+ apply(erule_tac x="Stk(stk1)" in allE)
+ apply(erule_tac impE) apply(force simp add: stk_size_def)
+ apply(simp)
+ apply(elim exE)
+ 
+
+
+
+lemma tree_subst_tree_to_leaves: "
+  (! t0 kvs_c. 
+    ((t0 |> tree_to_leaves) = ((kvs_c)))
+    -->(tree_subst c0 s0 t0 stk0) |> (map_option tree_to_leaves) = Some(kvs_l@kvs_c@kvs_r))
+  --> True
+"
+oops
 
 section "parameters"
 

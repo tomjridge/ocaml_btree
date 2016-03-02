@@ -380,7 +380,7 @@ lemma fs_step_is_invariant: "
        apply(thin_tac "fsl=?x")
        apply(thin_tac "n0=0")
        apply(clarsimp)
-       apply(force simp add: key_to_v_def rev_apply_def)
+       apply(force simp add: key_to_v_def rev_apply_def tree_to_kvs_def)
 
        (* suc - should be a contradiction with leaf frame *)
        apply(rename_tac n0')

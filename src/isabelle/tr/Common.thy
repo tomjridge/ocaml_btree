@@ -117,13 +117,26 @@ type_synonym tree_height = nat
 
 lemma FIXME: "P" sorry
 
-function tree_to_kvs :: "('k,'v) tree => ('k key *'v value_t) list" where
-  "tree_to_kvs (Tr_lf(kvs)) = kvs"
-  | "tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n+1] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat)" (* we use n+1 because there must be n (i.e. number of keys + 1 departing from index 0) subtrees in each internal node*)
+
+function tree_to_leaves :: "('k,'v) tree => ('k key *'v value_t) list list" where
+  "tree_to_leaves (Tr_lf(kvs)) = [kvs]"
+  | "tree_to_leaves (Tr_nd(n,ks,ts)) = (
+    [0..<n+1] |> (List.map ts) |> (List.map tree_to_leaves) |> List.concat)"
 by pat_completeness auto
-termination  (* tree_to_kvs_dom is not right here - the function package seems confused FIXME *)
+termination  (* tree_to_leavess_dom is not right here - the function package seems confused FIXME *)
   apply(force intro:FIXME)
   done
+
+
+definition tree_to_kvs :: "('k,'v) tree => ('k key *'v value_t) list" where
+  "tree_to_kvs t0 == tree_to_leaves t0 |> List.concat"
+
+lemma tree_to_kvs_simp: "
+  (tree_to_kvs (Tr_lf(kvs)) = kvs)
+  & (tree_to_kvs (Tr_nd(n,ks,ts)) = ([0..<n+1] |> (List.map ts) |> (List.map tree_to_kvs) |> List.concat))
+"
+  sorry
+
 
 
 section "page_ref_to_tree, page_ref_to_map, page_ref_key_to_v"
@@ -206,6 +219,7 @@ that, given a key, if there is a value corresponding to the key (which is unique
 returned page ref identifies the relevant subtree.
 
 *)
+(* FIXME following should be key to index *)
 datatype ('bs,'k,'r,'v) key_to_ref = Key_to_ref "('r,'k) node_frame => 'k key => nat (* 'r page_ref *)" 
 (* datatype ('bs,'k,'r,'v) key_to_v = Key_to_v "('k,'v) leaf_frame => 'k key => 'v option"  (* may be no such v *) - there is only one impl! *)
 
