@@ -6,8 +6,8 @@ EXTRACTDIR:=$(shell dirname $(LEM))/ocaml-lib/
 CAMLCINCLUDES:=-I $(EXTRACTDIR)/dependencies/zarith zarith.cma -I $(EXTRACTDIR) extract.cma
 CAMLC:=ocamlfind ocamlc nums.cma $(CAMLCINCLUDES) -dllpath $(EXTRACTDIR)/dependencies/zarith/ -linkpkg
 
-BTREE_FILE:=btree.lem
-BTREE_TESTS_FILE:=btreeTests.lem
+BTREE_FILE:=abstract_btree.lem
+BTREE_TESTS_FILE:=abstract_btreeTests.lem
 ISA_GEN_DIR:=isabelle/gen_isabelle
 OC_GEN_DIR:=ocaml/gen_ocaml
 COVERAGE_DIR=ocaml/result_$(shell date -I)
@@ -27,11 +27,11 @@ generate_ocaml_btree: build_lem
 	chmod ugo-w $(OC_GEN_DIR)/*.ml
 
 build_ocaml: generate_ocaml_btree
-	$(CAMLC) -a -o $(OC_GEN_DIR)/btree.cma $(OC_GEN_DIR)/btree.ml
+	$(CAMLC) -a -o $(OC_GEN_DIR)/btree.cma $(OC_GEN_DIR)/abstract_btree.ml
 
 run_ocaml_tests: build_ocaml
 	$(CAMLC) \
-		-package bisect_ppx -o $(OC_GEN_DIR)/tests -I $(OC_GEN_DIR) $(OC_GEN_DIR)/btree.ml $(OC_GEN_DIR)/btreeTests.ml $(OC_GEN_DIR)/btreeTestsAuxiliary.ml
+		-package bisect_ppx -o $(OC_GEN_DIR)/tests -I $(OC_GEN_DIR) $(OC_GEN_DIR)/abstract_btree.ml $(OC_GEN_DIR)/abstract_btreeTests.ml $(OC_GEN_DIR)/abstract_btreeTestsAuxiliary.ml
 	./$(OC_GEN_DIR)/tests
 	mkdir -p $(COVERAGE_DIR)
 	mv bisect*.out $(COVERAGE_DIR)
